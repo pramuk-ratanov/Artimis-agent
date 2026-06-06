@@ -102,11 +102,16 @@
 
 /* ═══════════════════════════════════════════════════════
    Reset
+
+   NOTE: Do NOT add an unlayered universal margin/padding reset here.
+   In Tailwind v4 every utility lives inside the utilities layer, and
+   unlayered rules ALWAYS beat layered ones in the cascade. An unlayered
+   universal padding:0 therefore silently overrides EVERY px/p utility in
+   the app (zero padding everywhere). Tailwind preflight already resets
+   margin/padding inside its layers, so we only set box-sizing.
    ═══════════════════════════════════════════════════════ */
 
 *, *::before, *::after {
-  margin: 0;
-  padding: 0;
   box-sizing: border-box;
 }
 
