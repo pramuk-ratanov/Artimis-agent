@@ -72,20 +72,22 @@ export function ArtimisSidebar({
   }
 
   return (
-    <div className="w-[200px] h-full shrink-0 flex flex-col bg-surface-1 border-r border-surface-3 overflow-hidden">
-      {/* Header */}
-      <div className="h-[40px] px-2.5 flex items-center gap-2 border-b border-surface-3 shrink-0">
+    <div className="w-[220px] h-full shrink-0 flex flex-col bg-surface-1 border-r border-surface-3 overflow-hidden">
+      {/* Header — prominent logo */}
+      <div className="px-4 py-3.5 flex items-center gap-3 border-b border-surface-3 shrink-0">
         <LivingSignal state={signalState} />
-        <span className="text-label font-semibold text-signal-400 tracking-wide">Artimis</span>
+        <span className="text-body font-bold text-signal-400 tracking-widest uppercase font-share">
+          Artimis
+        </span>
       </div>
 
       {/* New Chat */}
-      <div className="p-2 shrink-0">
+      <div className="p-3 shrink-0">
         <button
           onClick={() => onNewChat(null)}
-          className="w-full flex items-center gap-2 h-8 px-2 rounded-control bg-surface-2 text-label
+          className="w-full flex items-center gap-2 h-9 px-3 rounded-control bg-surface-2 text-label
             font-medium text-ink-secondary hover:border-signal-500 hover:text-ink-primary
-            border border-transparent transition-all duration-150 ease-expo-out"
+            border border-transparent transition-all duration-150 ease-expo-out font-share"
         >
           <Plus size={14} weight="regular" />
           <span>New Chat</span>
@@ -93,25 +95,25 @@ export function ArtimisSidebar({
       </div>
 
       {/* Nav scroll */}
-      <div className="flex-1 overflow-y-auto px-2">
+      <div className="flex-1 overflow-y-auto px-3">
 
         {/* CHATS */}
         <button
           onClick={() => setChatsOpen(!chatsOpen)}
           className="w-full flex items-center gap-1.5 h-7 px-2 text-label font-medium text-ink-muted
-            hover:text-ink-secondary transition-colors duration-150"
+            hover:text-ink-secondary transition-colors duration-150 font-share"
         >
           {chatsOpen ? <CaretDown size={10} /> : <CaretRight size={10} />}
           <span>CHATS</span>
         </button>
 
         {chatsOpen && (
-          <div className="ml-2">
+          <div className="ml-1.5 mt-0.5 space-y-0.5">
             {unassigned.map(c => (
               <button
                 key={c.id}
                 onClick={() => onSelectChat(c.id)}
-                className={`sidebar-item w-full text-left px-1.5 py-0.5 text-label rounded-control
+                className={`sidebar-item w-full text-left px-2 py-1 text-label rounded-control font-share
                   ${c.id === activeChatId
                     ? "bg-surface-2 text-ink-primary border border-surface-3"
                     : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
@@ -122,14 +124,14 @@ export function ArtimisSidebar({
 
             {folders.map(f => (
               <div key={f.name} className="mt-1">
-                <div className="px-2 py-0.5 text-caption font-medium text-ink-muted/70 tracking-wider">
+                <div className="px-2 py-1 text-caption font-medium text-ink-muted/70 tracking-wider font-share">
                   {f.name} <span className="text-ink-faint ml-1">{f.chats.length}</span>
                 </div>
                 {f.chats.map(c => (
                   <button
                     key={c.id}
                     onClick={() => onSelectChat(c.id)}
-                    className={`sidebar-item w-full text-left px-1.5 py-0.5 text-label rounded-control
+                    className={`sidebar-item w-full text-left px-2 py-1 text-label rounded-control font-share
                       ${c.id === activeChatId
                         ? "bg-surface-2 text-ink-primary border border-surface-3"
                         : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
@@ -143,8 +145,8 @@ export function ArtimisSidebar({
             {!showingNewProject ? (
               <button
                 onClick={() => setShowingNewProject(true)}
-                className="w-full text-left px-1.5 py-0.5 text-caption font-medium text-ink-muted
-                  hover:text-ink-secondary transition-colors"
+                className="w-full text-left px-2 py-1 text-caption font-medium text-ink-muted
+                  hover:text-ink-secondary transition-colors font-share"
               >
                 + New project
               </button>
@@ -164,7 +166,7 @@ export function ArtimisSidebar({
                 <button
                   onClick={handleCreateProject}
                   className="px-2 py-1 text-label font-medium text-signal-400 hover:text-signal-300
-                    transition-colors"
+                    transition-colors font-share"
                 >
                   OK
                 </button>
@@ -174,7 +176,7 @@ export function ArtimisSidebar({
         )}
 
         {/* TOOLS */}
-        <div className="mt-2 mb-0.5 px-2 text-caption font-medium text-ink-muted tracking-wider">
+        <div className="mt-3 mb-1 px-2 text-caption font-medium text-ink-muted tracking-wider font-share">
           TOOLS
         </div>
 
@@ -182,7 +184,7 @@ export function ArtimisSidebar({
           <button
             key={t.id}
             onClick={() => { onSelectTool(t.id); if (activeTool === t.id) onSelectTool("") }}
-            className={`sidebar-item w-full flex items-center gap-2 px-1.5 py-0.5 text-label rounded-control
+            className={`sidebar-item w-full flex items-center gap-2 px-2 py-1 text-label rounded-control font-share
               ${activeTool === t.id
                 ? "bg-surface-2 text-ink-primary border border-surface-3"
                 : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
@@ -196,12 +198,12 @@ export function ArtimisSidebar({
       </div>
 
       {/* Footer */}
-      <div className="h-[40px] px-2.5 flex items-center justify-between border-t border-surface-3 shrink-0">
+      <div className="h-[42px] px-4 flex items-center justify-between border-t border-surface-3 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-signal-600 flex items-center justify-center text-caption font-bold text-ink-primary">
+          <div className="w-5 h-5 rounded-full bg-signal-600 flex items-center justify-center text-caption font-bold text-ink-primary font-share">
             AD
           </div>
-          <span className="text-label font-medium text-ink-secondary">admin</span>
+          <span className="text-label font-medium text-ink-secondary font-share">admin</span>
         </div>
         <button
           onClick={onOpenSettings}

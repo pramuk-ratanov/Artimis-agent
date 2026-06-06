@@ -163,6 +163,14 @@ function App() {
     if (!streaming && signalState === "streaming") setSignalState("idle")
   }, [signalState])
 
+  const handleRetry = useCallback(() => {
+    // Find the last user message and resend it
+    const lastUserMsg = activeChat.messages.filter(m => m.role === "user").pop()
+    if (lastUserMsg) {
+      handleSend(lastUserMsg.content)
+    }
+  }, [activeChat.messages, handleSend])
+
   const sidebarChats: ChatSession[] = chats.map(c => ({
     id: c.id, name: c.name, projectId: c.projectId, updatedAt: c.updatedAt,
   }))
@@ -229,6 +237,7 @@ function App() {
               <ChatUI
                 messages={activeChat.messages}
                 onSend={handleSend}
+                onRetry={handleRetry}
                 onOpenTool={handleSelectTool}
                 signalState={signalState}
                 onStreamingChange={handleStreamingChange}

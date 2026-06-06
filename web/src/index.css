@@ -126,6 +126,7 @@ body {
   background: var(--color-surface-0);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -191,10 +192,7 @@ body {
    Utility classes
    ═══════════════════════════════════════════════════════ */
 
-/* Main heading override — the only element that gets system sans */
-.heading-default {
-  font-family: var(--font-sans) !important;
-}
+/* Main heading — inherits body font */
 
 /* Type scale utilities */
 .text-display  { font-size: var(--font-size-display); }
@@ -227,7 +225,13 @@ body {
    ═══════════════════════════════════════════════════════ */
 
 .msg-turn {
-  max-width: 65ch;
+  max-width: 72ch;
+  padding: 0;
+}
+
+.msg-turn p {
+  margin: 0;
+  padding: 4px 0;
 }
 
 /* Markdown rendered content */

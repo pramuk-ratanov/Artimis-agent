@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "re
 import { HomeState } from "@/components/home-state"
 import type { SignalState } from "@/components/living-signal"
 import type { ToolCall } from "@/lib/api"
+import { createMemory } from "@/lib/api"
 
 export interface ChatMessage {
   id: string
@@ -16,6 +17,7 @@ export interface ChatMessage {
 interface ChatUIProps {
   messages: ChatMessage[]
   onSend: (text: string) => void
+  onRetry?: () => void
   onOpenTool?: (tool: string) => void
   signalState?: SignalState
   onStreamingChange?: (streaming: boolean) => void
@@ -44,24 +46,29 @@ function renderMarkdown(content: string): string {
     .replace(/^(?!<[a-z]|$)(.+)$/gm, '<p>$1</p>')
 }
 
+/** Typewriter: reveals text character-by-character at human reading speed */
 function StreamingMessage({ content, onDone }: { content: string; onDone: () => void }) {
   const [displayed, setDisplayed] = useState("")
-  const [done, setDone] = useState(false)
+  const doneRef = useRef(false)
 
   useEffect(() => {
     let i = 0
     const chars = [...content]
+    // Speed: 2-5 chars per tick at ~15ms = ~200-300 chars/sec (fast reading speed)
     const timer = setInterval(() => {
       if (i >= chars.length) {
         clearInterval(timer)
-        setDone(true)
-        onDone()
+        if (!doneRef.current) {
+          doneRef.current = true
+          onDone()
+        }
         return
       }
-      const chunk = chars.slice(i, i + (Math.random() > 0.5 ? 3 : 1)).join("")
-      i += chunk.length
+      const chunkSize = Math.floor(Math.random() * 4) + 2 // 2-5 chars per frame
+      const chunk = chars.slice(i, i + chunkSize).join("")
+      i += chunkSize
       setDisplayed(prev => prev + chunk)
-    }, 20)
+    }, 12)
     return () => clearInterval(timer)
   }, [content, onDone])
 
@@ -69,25 +76,27 @@ function StreamingMessage({ content, onDone }: { content: string; onDone: () => 
     <span>
       <span
         className="msg-content"
-        style={{ fontFamily: "var(--font-sans)", fontSize: "var(--font-size-body)", lineHeight: 1.65, color: "var(--color-ink-primary)" }}
         dangerouslySetInnerHTML={{ __html: renderMarkdown(displayed) }}
       />
-      {!done && <span className="caret-blink text-signal-400 font-mono">_</span>}
+      {displayed.length < content.length && (
+        <span className="caret-blink text-signal-400 font-share">_</span>
+      )}
     </span>
   )
 }
 
 export function ChatUI({
-  messages, onSend, onOpenTool, signalState = "idle", onStreamingChange,
+  messages, onSend, onRetry, onOpenTool, signalState: _signalState = "idle", onStreamingChange,
   placeholder = "Message Artimis...", isLoading = false,
 }: ChatUIProps) {
   const [input, setInput] = useState("")
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
   const feedRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const [lastMsgId, setLastMsgId] = useState<string | null>(null)
+  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
 
-  // Auto-scroll to bottom unless user scrolled up
+  // Auto-scroll to bottom
   useEffect(() => {
     const el = feedRef.current
     if (!el) return
@@ -97,14 +106,14 @@ export function ChatUI({
     }
   }, [messages])
 
-  // Detect new streaming message
+  // Detect new assistant message and start streaming
   useEffect(() => {
     const last = messages[messages.length - 1]
-    if (last && last.role === "assistant" && last.id !== lastMsgId) {
-      setLastMsgId(last.id)
+    if (last && last.role === "assistant" && last.id !== streamingMsgId) {
+      setStreamingMsgId(last.id)
       onStreamingChange?.(true)
     }
-  }, [messages, lastMsgId, onStreamingChange])
+  }, [messages, streamingMsgId, onStreamingChange])
 
   useEffect(() => {
     if (messages.length === 0) inputRef.current?.focus()
@@ -134,7 +143,32 @@ export function ChatUI({
     onStreamingChange?.(false)
   }, [onStreamingChange])
 
-  const isStreaming = signalState === "streaming"
+  const handleCopy = async (content: string, msgId: string) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedId(msgId)
+      setTimeout(() => setCopiedId(null), 2000)
+    } catch {
+      // Fallback
+      const ta = document.createElement("textarea")
+      ta.value = content
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand("copy")
+      document.body.removeChild(ta)
+      setCopiedId(msgId)
+      setTimeout(() => setCopiedId(null), 2000)
+    }
+  }
+
+  const handleSaveToMemory = async (content: string) => {
+    try {
+      const { createMemory } = await import("@/lib/api")
+      await createMemory(content, [], "manual")
+    } catch {
+      // Best effort
+    }
+  }
 
   return (
     <div className="flex flex-col h-full bg-surface-0">
@@ -143,23 +177,24 @@ export function ChatUI({
       ) : (
         <>
           {/* Messages feed */}
-          <div ref={feedRef} className="flex-1 overflow-y-auto px-4 py-4">
-            <div className="max-w-[65ch] mx-auto space-y-3">
+          <div ref={feedRef} className="flex-1 overflow-y-auto px-8 py-6">
+            <div className="max-w-[72ch] mx-auto space-y-6">
               {messages.map((msg, i) => {
-                const isStreamingMsg = isStreaming && i === messages.length - 1 && msg.role === "assistant"
+                const isStreamingMsg = streamingMsgId === msg.id && msg.role === "assistant"
+                const isLast = i === messages.length - 1
 
                 return (
                   <div key={msg.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(i, 3) * 60}ms` }}>
                     {/* Timestamp */}
                     {msg.timestamp && (
-                      <div className={`text-caption text-ink-faint mb-1 ${msg.role === "user" ? "text-right" : ""}`}>
+                      <div className={`text-caption text-ink-faint mb-1.5 font-share ${msg.role === "user" ? "text-right" : ""}`}>
                         {msg.timestamp}
                       </div>
                     )}
 
                     {/* System messages */}
                     {msg.role === "system" && (
-                      <div className="bg-surface-1 border border-surface-3 rounded-card px-4 py-3 text-label text-ink-muted italic">
+                      <div className="bg-surface-1 border border-surface-3 rounded-card px-5 py-3 text-label text-ink-muted italic font-share">
                         {msg.content}
                       </div>
                     )}
@@ -168,7 +203,7 @@ export function ChatUI({
                     {msg.role === "user" && (
                       <div className="flex justify-end">
                         <div className="msg-turn text-right">
-                          <p className="text-body text-ink-secondary" style={{ fontFamily: "var(--font-sans)" }}>
+                          <p className="text-body text-ink-secondary font-share leading-relaxed">
                             {msg.content}
                           </p>
                         </div>
@@ -183,8 +218,7 @@ export function ChatUI({
                             <StreamingMessage content={msg.content} onDone={handleStreamDone} />
                           ) : (
                             <div
-                              className="msg-content text-body text-ink-primary"
-                              style={{ fontFamily: "var(--font-sans)" }}
+                              className="msg-content text-body text-ink-primary font-share leading-relaxed"
                               dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
                             />
                           )}
@@ -192,7 +226,7 @@ export function ChatUI({
 
                         {/* Tool calls block */}
                         {msg.tool_calls && msg.tool_calls.length > 0 && (
-                          <div className="mt-2">
+                          <div className="mt-3">
                             {msg.tool_calls.map((tc, j) => {
                               const tcId = `${msg.id}-tc-${j}`
                               const open = expandedTools.has(tcId)
@@ -203,13 +237,13 @@ export function ChatUI({
                                     className="flex items-center gap-1.5 text-code font-mono text-ink-muted
                                       hover:text-ink-secondary transition-colors duration-150"
                                   >
-                                    <span>{open ? "▾" : "▸"}</span>
+                                    <span>{open ? "\u25BE" : "\u25B8"}</span>
                                     <span>{tc.name}</span>
-                                    <span className="text-ink-faint">· executed call</span>
+                                    <span className="text-ink-faint">{"\u00B7"} executed</span>
                                   </button>
                                   {open && (
                                     <div className="mt-1 ml-5 p-2 bg-surface-1 border border-surface-3 rounded-control
-                                      text-code font-mono text-ink-muted overflow-x-auto">
+                                      text-code font-mono text-ink-muted overflow-x-auto max-h-[160px] overflow-y-auto">
                                       {JSON.stringify(tc.arguments, null, 2)}
                                     </div>
                                   )}
@@ -219,16 +253,25 @@ export function ChatUI({
                           </div>
                         )}
 
-                        {/* Hover affordances (Copy / Save / Retry on last) */}
-                        <div className="flex gap-3 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                          <button className="text-caption text-ink-muted hover:text-ink-secondary transition-colors">
-                            Copy
+                        {/* Hover affordances */}
+                        <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                          <button
+                            onClick={() => handleCopy(msg.content, msg.id)}
+                            className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors"
+                          >
+                            {copiedId === msg.id ? "Copied" : "Copy"}
                           </button>
-                          <button className="text-caption text-ink-muted hover:text-ink-secondary transition-colors">
+                          <button
+                            onClick={() => handleSaveToMemory(msg.content)}
+                            className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors"
+                          >
                             Save to Memory
                           </button>
-                          {i === messages.length - 1 && (
-                            <button className="text-caption text-ink-muted hover:text-ink-secondary transition-colors">
+                          {isLast && onRetry && (
+                            <button
+                              onClick={onRetry}
+                              className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors"
+                            >
                               Retry
                             </button>
                           )}
@@ -240,12 +283,12 @@ export function ChatUI({
               })}
 
               {/* Loading state */}
-              {isLoading && !isStreaming && (
+              {isLoading && !streamingMsgId && (
                 <div className="animate-fade-up">
-                  <div className="flex items-center gap-2 text-label text-ink-muted italic">
+                  <div className="flex items-center gap-2 text-label text-ink-muted italic font-share">
                     <span>Thinking</span>
                     <span className="animate-signal-pulse inline-block w-1.5 h-1.5 rounded-full bg-signal-400" />
-                    <span>Analyzing context & running tools…</span>
+                    <span>Analyzing context &amp; running tools...</span>
                   </div>
                 </div>
               )}
@@ -255,12 +298,12 @@ export function ChatUI({
       )}
 
       {/* Composer */}
-      <div className="shrink-0 px-4 pb-4">
-        <div className="max-w-[65ch] mx-auto">
+      <div className="shrink-0 px-8 pb-6 pt-2">
+        <div className="max-w-[72ch] mx-auto">
           <div className="flex items-stretch bg-surface-1 border border-surface-3 rounded-composer
             overflow-hidden focus-within:border-signal-500 focus-within:shadow-[0_0_0_1px_rgba(14,165,233,0.35)]
             transition-all duration-150 ease-expo-out">
-            <span className="flex items-center pl-2.5 pr-1.5 text-body font-mono text-signal-400 select-none">
+            <span className="flex items-center pl-3 pr-1.5 text-body font-mono text-signal-400 select-none">
               &gt;
             </span>
             <input
@@ -273,13 +316,13 @@ export function ChatUI({
               disabled={isLoading}
               spellCheck={false}
               className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary
-                font-share placeholder:text-ink-muted py-2 px-1"
+                font-share placeholder:text-ink-muted py-2.5 px-1"
               style={{ caretColor: "var(--color-signal-500)" }}
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || isLoading}
-              className={`px-4 text-label font-semibold transition-all duration-150 ease-expo-out
+              className={`px-5 text-label font-semibold font-share transition-all duration-150 ease-expo-out
                 active:scale-[0.97]
                 ${input.trim()
                   ? "bg-signal-600 text-ink-primary"

@@ -10,22 +10,22 @@ export function HomeState({ onSend, onOpenTool }: {
   const greeting = h < 6 ? "Good evening." : h < 12 ? "Good morning." : h < 17 ? "Good afternoon." : "Good evening."
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-4">
-      <h1 className="heading-default text-display font-semibold tracking-tight text-center mb-6">
+    <div className="flex flex-col items-center justify-center h-full px-8">
+      <h1 className="heading-default text-display font-semibold tracking-tight text-center mb-8 font-share">
         {greeting}
       </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-[420px] w-full mb-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-[480px] w-full mb-4">
         {/* Full-width primary card */}
         <button
           onClick={() => onOpenTool("deep-research")}
-          className="md:col-span-2 bg-surface-2 border border-surface-3 rounded-card p-3.5 text-left
+          className="md:col-span-2 bg-surface-2 border border-surface-3 rounded-card p-4 text-left
             hover:border-signal-400 hover:bg-surface-3 transition-all duration-150 ease-expo-out group"
         >
-          <div className="w-7 h-7 flex items-center justify-center rounded-control bg-surface-1 mb-2">
-            <Compass size={14} weight="regular" className="text-signal-400" />
+          <div className="w-8 h-8 flex items-center justify-center rounded-control bg-surface-1 mb-3">
+            <Compass size={16} weight="regular" className="text-signal-400" />
           </div>
-          <div className="text-heading font-semibold text-ink-primary mb-1 group-hover:text-signal-300">
+          <div className="text-heading font-semibold text-ink-primary mb-1.5 group-hover:text-signal-300 font-share">
             Research deeply
           </div>
           <div className="text-label text-ink-secondary font-share">
@@ -36,13 +36,13 @@ export function HomeState({ onSend, onOpenTool }: {
         {/* Half-width cards */}
         <button
           onClick={() => onSend("Pressure-test this idea")}
-          className="bg-surface-2 border border-surface-3 rounded-card p-3.5 text-left
+          className="bg-surface-2 border border-surface-3 rounded-card p-4 text-left
             hover:border-signal-400 hover:bg-surface-3 transition-all duration-150 ease-expo-out group"
         >
-          <div className="w-7 h-7 flex items-center justify-center rounded-control bg-surface-1 mb-2">
-            <Scales size={14} weight="regular" className="text-signal-400" />
+          <div className="w-8 h-8 flex items-center justify-center rounded-control bg-surface-1 mb-3">
+            <Scales size={16} weight="regular" className="text-signal-400" />
           </div>
-          <div className="text-heading font-semibold text-ink-primary mb-1 group-hover:text-signal-300">
+          <div className="text-heading font-semibold text-ink-primary mb-1.5 group-hover:text-signal-300 font-share">
             Pressure-test
           </div>
           <div className="text-label text-ink-secondary font-share">
@@ -52,13 +52,13 @@ export function HomeState({ onSend, onOpenTool }: {
 
         <button
           onClick={() => onSend("Help me plan something")}
-          className="bg-surface-2 border border-surface-3 rounded-card p-3.5 text-left
+          className="bg-surface-2 border border-surface-3 rounded-card p-4 text-left
             hover:border-signal-400 hover:bg-surface-3 transition-all duration-150 ease-expo-out group"
         >
-          <div className="w-7 h-7 flex items-center justify-center rounded-control bg-surface-1 mb-2">
-            <Lightbulb size={14} weight="regular" className="text-signal-400" />
+          <div className="w-8 h-8 flex items-center justify-center rounded-control bg-surface-1 mb-3">
+            <Lightbulb size={16} weight="regular" className="text-signal-400" />
           </div>
-          <div className="text-heading font-semibold text-ink-primary mb-1 group-hover:text-signal-300">
+          <div className="text-heading font-semibold text-ink-primary mb-1.5 group-hover:text-signal-300 font-share">
             Plan something
           </div>
           <div className="text-label text-ink-secondary font-share">
