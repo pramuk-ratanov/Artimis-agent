@@ -46,10 +46,26 @@ REPO_URL="https://github.com/pramuk-ratanov/Artimis-agent.git"
 # ─── Check prerequisites ──────────────────────────────────
 
 if ! command -v python3 &>/dev/null; then
-    echo -e "${RED}Python 3.11+ is required. Install it first:${NC}"
-    echo "  Ubuntu/Debian: sudo apt install python3 python3-pip python3-venv"
-    echo "  macOS:         brew install python@3.11"
-    exit 1
+    echo -e "${RED}Python 3.11+ is required. Installing...${NC}"
+    if command -v apt &>/dev/null; then
+        sudo apt update -qq && sudo apt install -y python3 python3-pip python3-venv
+    elif command -v yum &>/dev/null; then
+        sudo yum install -y python3 python3-pip
+    else
+        echo -e "${RED}Could not install Python automatically. Install it manually.${NC}"
+        exit 1
+    fi
+fi
+
+# Check venv module
+if ! python3 -m venv --help &>/dev/null 2>&1; then
+    echo -e "${YELLOW}[warn]${NC} python3-venv not found. Installing..."
+    if command -v apt &>/dev/null; then
+        sudo apt update -qq && sudo apt install -y "python${PYTHON_VERSION}-venv"
+    else
+        echo -e "${RED}Please install python3-venv manually and re-run.${NC}"
+        exit 1
+    fi
 fi
 
 PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
