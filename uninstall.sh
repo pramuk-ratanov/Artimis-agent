@@ -85,7 +85,7 @@ if [ "$KEEP_DATA" = true ]; then
     echo -e "    ${YELLOW}$ARTIMIS_HOME/${NC}"
     echo ""
     echo "  To reinstall later:"
-    echo "    curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/main/install.sh | bash"
+    echo "    curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/master/install.sh | bash"
     echo "  Your memories, skills, and settings will be preserved."
 else
     echo "  Removing everything..."
@@ -94,7 +94,7 @@ else
     echo -e "  ${GREEN}Artimis has been completely removed.${NC}"
     echo ""
     echo "  To reinstall later:"
-    echo "    curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/main/install.sh | bash"
+    echo "    curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/master/install.sh | bash"
 fi
 
 echo ""
