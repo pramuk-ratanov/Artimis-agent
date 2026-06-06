@@ -299,6 +299,97 @@ async def delete_gallery_image(image_id: str):
     return {"deleted": True}
 
 
+# ─── Brain: Skills ─────────────────────────────────────────
+
+@app.get("/api/skills")
+async def list_skills(tag: Optional[str] = None, search: Optional[str] = None):
+    """List all skills. Optionally filter by tag or search term."""
+    conn = db.get_db()
+    query = "SELECT * FROM skills WHERE 1=1"
+    params = []
+    if tag:
+        query += " AND tags LIKE ?"
+        params.append(f'%{tag}%')
+    if search:
+        query += " AND (name LIKE ? OR content LIKE ?)"
+        params.extend([f'%{search}%', f'%{search}%'])
+    query += " ORDER BY pinned DESC, updated_at DESC"
+    rows = conn.execute(query, params).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+class CreateSkillRequest(BaseModel):
+    name: str
+    content: str
+    tags: Optional[list[str]] = None
+
+
+@app.post("/api/skills")
+async def create_skill(req: CreateSkillRequest):
+    from artimis.engine.brain import create_skill as brain_create_skill
+    return brain_create_skill(name=req.name, content=req.content, tags=req.tags)
+
+
+@app.get("/api/skills/{skill_id}")
+async def get_skill(skill_id: str):
+    conn = db.get_db()
+    row = conn.execute("SELECT * FROM skills WHERE id = ?", (skill_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "Skill not found")
+    return dict(row)
+
+
+class UpdateSkillRequest(BaseModel):
+    content: str
+
+
+@app.patch("/api/skills/{skill_id}")
+async def update_skill(skill_id: str, req: UpdateSkillRequest):
+    from artimis.engine.brain import update_skill_content
+    s = update_skill_content(skill_id, req.content)
+    if not s:
+        raise HTTPException(404, "Skill not found or is pinned")
+    return s
+
+
+@app.post("/api/skills/{skill_id}/pin")
+async def toggle_skill_pin(skill_id: str):
+    conn = db.get_db()
+    row = conn.execute("SELECT * FROM skills WHERE id = ?", (skill_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(404, "Skill not found")
+    new_pinned = 0 if row["pinned"] else 1
+    conn.execute("UPDATE skills SET pinned = ?, updated_at = ? WHERE id = ?",
+                 (new_pinned, db.now(), skill_id))
+    conn.commit()
+    conn.close()
+    return {"id": skill_id, "pinned": bool(new_pinned)}
+
+
+@app.get("/api/skills/{skill_id}/versions")
+async def get_skill_versions(skill_id: str):
+    from artimis.engine.brain import get_skill_versions
+    return get_skill_versions(skill_id)
+
+
+@app.post("/api/skills/{skill_id}/rollback")
+async def rollback_skill(skill_id: str, version: int):
+    from artimis.engine.brain import rollback_skill
+    s = rollback_skill(skill_id, version)
+    if not s:
+        raise HTTPException(404, "Skill or version not found")
+    return s
+
+
+@app.get("/api/skills/relevant")
+async def get_relevant_skills(q: str):
+    from artimis.engine.brain import get_relevant_skills
+    return get_relevant_skills(q)
+
+
 # ─── Cookbook Templates ────────────────────────────────────
 
 @app.get("/api/cookbook/templates")

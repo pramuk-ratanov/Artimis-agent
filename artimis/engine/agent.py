@@ -85,22 +85,15 @@ def run_agent(
     # System prompt
     system_content = SYSTEM_PROMPT
 
-    # Inject active memories if session_id provided
+    # Inject Brain context (relevant memories + skills)
     if session_id:
         try:
-            from artimis.db.manager import list_memories
-            active_memories = list_memories(active=True)
-            pinned_memories = list_memories(pinned=True)
-            if active_memories or pinned_memories:
-                memory_text = "\n\n## RELEVANT MEMORIES\n"
-                for m in pinned_memories[:5]:
-                    memory_text += f"- [PINNED] {m['content']}\n"
-                for m in active_memories[:10]:
-                    if m["id"] not in {pm["id"] for pm in pinned_memories}:
-                        memory_text += f"- {m['content']}\n"
-                system_content += memory_text
+            from artimis.engine.brain import process_user_message
+            brain_context = process_user_message(session_id, user_message)
+            if brain_context:
+                system_content += brain_context
         except Exception:
-            pass  # Memory injection is best-effort
+            pass  # Brain injection is best-effort
 
     messages.append({"role": "system", "content": system_content})
 
