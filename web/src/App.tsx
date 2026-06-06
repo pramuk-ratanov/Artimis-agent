@@ -19,7 +19,16 @@ import { SkillsPanel } from "@/components/panels/skills-panel"
 import { ThemePanel } from "@/components/panels/theme-panel"
 import { SettingsModal } from "@/components/panels/settings-modal"
 
-function gen() { return crypto.randomUUID() }
+function gen() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  // Fallback UUID v4 for older browsers
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
 
 interface FullChat { id: string; name: string; projectId: string | null; updatedAt: string; messages: ChatMessage[] }
 
