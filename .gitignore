@@ -14,7 +14,6 @@ build/
 
 # Web UI (has its own .gitignore too)
 web/node_modules/
-web/dist/
 
 # IDE
 .vscode/

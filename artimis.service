@@ -1,0 +1,23 @@
+[Unit]
+Description=Artimis Agent — Private AI Workspace
+After=network.target
+
+[Service]
+Type=simple
+User=%u
+WorkingDirectory=%h/.artimis/agent
+ExecStart=%h/.artimis/agent/venv/bin/python run.py --host 0.0.0.0 --port 7001
+Restart=on-failure
+RestartSec=5
+Environment=HOME=%h
+
+# Security hardening
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.artimis
+ReadOnlyPaths=%h/.artimis/agent
+
+[Install]
+WantedBy=multi-user.target
