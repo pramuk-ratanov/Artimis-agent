@@ -677,6 +677,100 @@ async def remove_webhook(req: WebhookRequest):
     return {"webhooks": "removed"}
 
 
+# ─── Config ───────────────────────────────────────────────
+
+_ARTIMIS_DIR = os.path.expanduser("~/.artimis")
+_ENV_FILE = os.path.join(_ARTIMIS_DIR, ".env")
+
+_CONFIG_KEYS = [
+    "ARTIMIS_MODEL",
+    "DEEPSEEK_API_KEY",
+    "OPENAI_API_KEY",
+    "GPT_API_KEY",
+    "OPENROUTER_API_KEY",
+    "ANTHROPIC_API_KEY",
+]
+
+
+def _mask(value: str) -> str:
+    """Show first 4 and last 4 chars, mask the middle."""
+    if not value or len(value) <= 8:
+        return "****"
+    return value[:4] + "*" * (len(value) - 8) + value[-4:]
+
+
+def _read_env_file() -> dict:
+    """Read ~/.artimis/.env and return a dict of key→value."""
+    data: dict = {}
+    if not os.path.exists(_ENV_FILE):
+        return data
+    with open(_ENV_FILE) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                key = key.strip()
+                val = val.strip().strip('"').strip("'")
+                if key:
+                    data[key] = val
+    return data
+
+
+def _write_env_file(data: dict) -> None:
+    """Write a dict of key→value to ~/.artimis/.env (KEY=VALUE lines)."""
+    os.makedirs(_ARTIMIS_DIR, exist_ok=True)
+    existing = _read_env_file()
+    existing.update({k: v for k, v in data.items() if v is not None})
+    # Remove keys explicitly set to empty string
+    existing = {k: v for k, v in existing.items() if v != ""}
+    with open(_ENV_FILE, "w") as f:
+        for key, val in existing.items():
+            f.write(f"{key}={val}\n")
+
+
+class ConfigRequest(BaseModel):
+    model: Optional[str] = None
+    DEEPSEEK_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
+    GPT_API_KEY: Optional[str] = None
+    OPENROUTER_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+
+
+@app.get("/api/config")
+async def get_config():
+    """Return the current model and stored provider keys (secrets masked)."""
+    stored = _read_env_file()
+    result: dict = {
+        "model": os.getenv("ARTIMIS_MODEL") or stored.get("ARTIMIS_MODEL", "deepseek-v4-pro"),
+        "keys": {},
+    }
+    key_names = [k for k in _CONFIG_KEYS if k != "ARTIMIS_MODEL"]
+    for key in key_names:
+        raw = os.getenv(key) or stored.get(key, "")
+        result["keys"][key] = _mask(raw) if raw else ""
+    return result
+
+
+@app.post("/api/config")
+async def save_config(req: ConfigRequest):
+    """Save API keys and/or default model to ~/.artimis/.env."""
+    updates: dict = {}
+    if req.model is not None:
+        updates["ARTIMIS_MODEL"] = req.model
+        os.environ["ARTIMIS_MODEL"] = req.model
+    for key in _CONFIG_KEYS:
+        if key == "ARTIMIS_MODEL":
+            continue
+        val = getattr(req, key, None)
+        if val is not None:
+            updates[key] = val
+            if val:
+                os.environ[key] = val
+    _write_env_file(updates)
+    return {"saved": True, "keys_updated": list(updates.keys())}
+
+
 # ─── Health ───────────────────────────────────────────────
 
 @app.get("/api/health")

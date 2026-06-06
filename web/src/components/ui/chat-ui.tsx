@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "re
 import { HomeState } from "@/components/home-state"
 import type { SignalState } from "@/components/living-signal"
 import type { ToolCall } from "@/lib/api"
+import { SpotlightButton } from "@/components/ui/spotlight-button"
+import { PulsePanel } from "@/components/ui/pulse-panel"
 
 export interface ChatMessage {
   id: string
@@ -176,7 +178,7 @@ export function ChatUI({
       ) : (
         <>
           {/* Messages feed */}
-          <div ref={feedRef} className="flex-1 overflow-y-auto px-8 py-6">
+          <div ref={feedRef} className="relative flex-1 overflow-y-auto px-8 py-6">
             <div className="max-w-[72ch] mx-auto space-y-6">
               {messages.map((msg, i) => {
                 const isStreamingMsg = streamingMsgId === msg.id && msg.role === "assistant"
@@ -281,17 +283,9 @@ export function ChatUI({
                 )
               })}
 
-              {/* Loading state */}
-              {isLoading && !streamingMsgId && (
-                <div className="animate-fade-up">
-                  <div className="flex items-center gap-2 text-label text-ink-muted italic font-share">
-                    <span>Thinking</span>
-                    <span className="animate-signal-pulse inline-block w-1.5 h-1.5 rounded-full bg-signal-400" />
-                    <span>Analyzing context &amp; running tools...</span>
-                  </div>
-                </div>
-              )}
             </div>
+            {/* Pulse panel — replaces simple Thinking indicator */}
+            <PulsePanel isLoading={isLoading && !streamingMsgId} />
           </div>
         </>
       )}
@@ -318,17 +312,19 @@ export function ChatUI({
                 font-share placeholder:text-ink-muted py-2.5 px-1"
               style={{ caretColor: "var(--color-signal-500)" }}
             />
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || isLoading}
-              className={`px-5 text-label font-semibold font-share transition-all duration-150 ease-expo-out
-                active:scale-[0.97]
-                ${input.trim()
-                  ? "bg-signal-600 text-ink-primary"
-                  : "bg-transparent text-ink-muted"}`}
-            >
-              Send
-            </button>
+            <SpotlightButton>
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || isLoading}
+                className={`px-5 text-label font-semibold font-share transition-all duration-150 ease-expo-out
+                  active:scale-[0.97]
+                  ${input.trim()
+                    ? "bg-signal-600 text-ink-primary"
+                    : "bg-transparent text-ink-muted"}`}
+              >
+                Send
+              </button>
+            </SpotlightButton>
           </div>
         </div>
       </div>

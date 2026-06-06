@@ -434,3 +434,34 @@ export function getNotifications() {
 export function healthCheck() {
   return fetchJSON<{ status: string; version: string }>("/api/health")
 }
+
+// ── Config ──
+
+export interface Config {
+  model: string
+  keys: {
+    DEEPSEEK_API_KEY: string
+    OPENAI_API_KEY: string
+    OPENROUTER_API_KEY: string
+    ANTHROPIC_API_KEY: string
+  }
+}
+
+export interface ConfigUpdate {
+  model?: string
+  DEEPSEEK_API_KEY?: string
+  OPENAI_API_KEY?: string
+  OPENROUTER_API_KEY?: string
+  ANTHROPIC_API_KEY?: string
+}
+
+export function getConfig() {
+  return fetchJSON<Config>("/api/config")
+}
+
+export function saveConfig(data: ConfigUpdate) {
+  return fetchJSON<Config>("/api/config", {
+    method: "POST",
+    body: JSON.stringify(data),
+  })
+}

@@ -29,21 +29,43 @@ if os.path.exists(_ENV_FILE):
                 if key and val and key not in os.environ:
                     os.environ[key] = val
 
-# Default model
+# Default model — supported models:
+#   DeepSeek:   deepseek-v4-pro, deepseek-v4-flash
+#   OpenAI:     gpt-4o, gpt-4o-mini, gpt-5.5
+#   OpenRouter: anthropic/claude-sonnet-4, anthropic/claude-opus-4, openai/gpt-5.5-pro
 DEFAULT_MODEL = os.getenv("ARTIMIS_MODEL", "deepseek-v4-pro")
 
 
-def _get_client() -> OpenAI:
-    """Get an OpenAI-compatible client using available API keys."""
+def _get_client(model: Optional[str] = None) -> OpenAI:
+    """Get an OpenAI-compatible client using available API keys.
+
+    Routing priority:
+      1. If model is prefixed with 'openai/' or 'anthropic/' → OpenRouter
+      2. DEEPSEEK_API_KEY  → DeepSeek
+      3. OPENAI_API_KEY / GPT_API_KEY → OpenAI
+      4. OPENROUTER_API_KEY → OpenRouter (generic fallback)
+      5. ANTHROPIC_API_KEY → OpenRouter (legacy alias)
+    """
+    openrouter_key = os.getenv("OPENROUTER_API_KEY")
     deepseek_key = os.getenv("DEEPSEEK_API_KEY")
-    openai_key = os.getenv("OPENAI_API_KEY")
+    openai_key = os.getenv("OPENAI_API_KEY") or os.getenv("GPT_API_KEY")
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+
+    # Route prefixed model names directly to OpenRouter
+    _model = model or DEFAULT_MODEL
+    if _model and (_model.startswith("openai/") or _model.startswith("anthropic/")):
+        _key = openrouter_key or anthropic_key or openai_key
+        if _key:
+            return OpenAI(api_key=_key, base_url="https://openrouter.ai/api/v1")
 
     if deepseek_key:
         return OpenAI(api_key=deepseek_key, base_url="https://api.deepseek.com/v1")
 
     if openai_key:
         return OpenAI(api_key=openai_key)
+
+    if openrouter_key:
+        return OpenAI(api_key=openrouter_key, base_url="https://openrouter.ai/api/v1")
 
     if anthropic_key:
         return OpenAI(
@@ -52,7 +74,8 @@ def _get_client() -> OpenAI:
         )
 
     raise RuntimeError(
-        "No API key found. Set DEEPSEEK_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY."
+        "No API key found. Set DEEPSEEK_API_KEY, OPENAI_API_KEY, GPT_API_KEY, "
+        "OPENROUTER_API_KEY, or ANTHROPIC_API_KEY."
     )
 
 
@@ -76,8 +99,8 @@ def run_agent(
     Returns:
         dict with keys: response, tool_calls_made, iterations, model_used
     """
-    client = _get_client()
     model_name = model or DEFAULT_MODEL
+    client = _get_client(model_name)
 
     # Build messages array
     messages = []

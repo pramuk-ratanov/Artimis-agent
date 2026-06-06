@@ -164,12 +164,21 @@ function App() {
   }, [signalState])
 
   const handleRetry = useCallback(() => {
-    // Find the last user message and resend it
     const lastUserMsg = activeChat.messages.filter(m => m.role === "user").pop()
     if (lastUserMsg) {
+      // Strip the last assistant message so the agent doesn't see its own
+      // previous (potentially partial/failed) response before we resend.
+      setChats(p => p.map(c => {
+        if (c.id !== activeChatId) return c
+        // Walk from the end and remove the last assistant message
+        const msgs = [...c.messages]
+        const lastAssistantIdx = msgs.map(m => m.role).lastIndexOf("assistant")
+        if (lastAssistantIdx !== -1) msgs.splice(lastAssistantIdx, 1)
+        return { ...c, messages: msgs }
+      }))
       handleSend(lastUserMsg.content)
     }
-  }, [activeChat.messages, handleSend])
+  }, [activeChat.messages, activeChatId, handleSend])
 
   const sidebarChats: ChatSession[] = chats.map(c => ({
     id: c.id, name: c.name, projectId: c.projectId, updatedAt: c.updatedAt,
@@ -207,7 +216,7 @@ function App() {
             onOpenSettings={() => setSettingsOpen(true)} activeTool={activeTool}
           />
 
-          <main className="flex-1 min-w-0 overflow-hidden relative">
+          <main className="flex-1 min-w-0 overflow-hidden relative dark-horizon-glow">
             {/* Notification bell */}
             <button
               className="absolute top-2 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-control

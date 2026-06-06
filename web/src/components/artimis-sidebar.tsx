@@ -6,6 +6,7 @@ import {
   CheckSquare, Wrench, Database, Palette, Gear, Compass,
 } from "@phosphor-icons/react"
 import { LivingSignal, type SignalState } from "@/components/living-signal"
+import { SpotlightButton } from "@/components/ui/spotlight-button"
 
 export interface Project { id: string; name: string }
 export interface ChatSession { id: string; name: string; projectId: string | null; updatedAt: string }
@@ -83,15 +84,17 @@ export function ArtimisSidebar({
 
       {/* New Chat */}
       <div className="p-3 shrink-0">
-        <button
-          onClick={() => onNewChat(null)}
-          className="w-full flex items-center gap-2 h-9 px-3 rounded-control bg-surface-2 text-label
-            font-medium text-ink-secondary hover:border-signal-500 hover:text-ink-primary
-            border border-transparent transition-all duration-150 ease-expo-out font-share"
-        >
-          <Plus size={14} weight="regular" />
-          <span>New Chat</span>
-        </button>
+        <SpotlightButton className="w-full rounded-control">
+          <button
+            onClick={() => onNewChat(null)}
+            className="w-full flex items-center gap-2 h-9 px-3 rounded-control bg-surface-2 text-label
+              font-medium text-ink-secondary hover:border-signal-500 hover:text-ink-primary
+              border border-transparent transition-all duration-150 ease-expo-out font-share"
+          >
+            <Plus size={14} weight="regular" />
+            <span>New Chat</span>
+          </button>
+        </SpotlightButton>
       </div>
 
       {/* Nav scroll */}

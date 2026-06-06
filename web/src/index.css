@@ -321,8 +321,61 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════
+   Dark Horizon Glow Background
+   ═══════════════════════════════════════════════════════ */
+
+.dark-horizon-glow {
+  background: radial-gradient(125% 125% at 50% 90%, #000000 40%, #0d1a36 100%);
+}
+
+/* ═══════════════════════════════════════════════════════
+   SpotlightButton — cursor-following glow on CTAs
+   Uses CSS custom props (--x, --y) set by JS on pointermove.
+   No re-renders; the ::before pseudo-element does all the work.
+   ═══════════════════════════════════════════════════════ */
+
+.spotlight-button-wrap {
+  position: relative;
+  display: inline-flex;
+  isolation: isolate;          /* own stacking context — glow stays local */
+}
+
+.spotlight-button-wrap::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  background: radial-gradient(
+    80px circle at var(--x, 50%) var(--y, 50%),
+    oklch(0.65 0.1 240 / 0.22) 0%,
+    oklch(0.65 0.1 240 / 0.08) 40%,
+    transparent 70%
+  );
+  z-index: 1;
+}
+
+.spotlight-button-wrap:hover::before {
+  opacity: 1;
+}
+
+/* Children sit above the glow layer */
+.spotlight-button-wrap > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* ═══════════════════════════════════════════════════════
    Reduced motion
    ═══════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .spotlight-button-wrap::before {
+    transition: none;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .animate-signal-breath,
