@@ -4,7 +4,6 @@ import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "re
 import { HomeState } from "@/components/home-state"
 import type { SignalState } from "@/components/living-signal"
 import type { ToolCall } from "@/lib/api"
-import { createMemory } from "@/lib/api"
 
 export interface ChatMessage {
   id: string
