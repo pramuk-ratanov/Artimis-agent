@@ -57,7 +57,10 @@ if ! command -v python3 &>/dev/null; then
     fi
 fi
 
-# Check venv module
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+echo -e "${GREEN}[ok]${NC} Python $PYTHON_VERSION"
+
+# Check venv module (must be after PYTHON_VERSION is set)
 if ! python3 -m venv --help &>/dev/null 2>&1; then
     echo -e "${YELLOW}[warn]${NC} python3-venv not found. Installing..."
     if command -v apt &>/dev/null; then
@@ -67,9 +70,6 @@ if ! python3 -m venv --help &>/dev/null 2>&1; then
         exit 1
     fi
 fi
-
-PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
-echo -e "${GREEN}[ok]${NC} Python $PYTHON_VERSION"
 
 if ! command -v git &>/dev/null; then
     echo -e "${YELLOW}[warn]${NC} git not found. Will download via curl instead."
