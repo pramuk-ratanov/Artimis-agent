@@ -53,6 +53,14 @@ class CreateTaskRequest(BaseModel):
     priority: str = "medium"
 
 
+class SubmitTaskRequest(BaseModel):
+    title: str
+    description: str = ""
+    session_id: Optional[str] = None
+    priority: str = "medium"
+    run_immediately: bool = False
+
+
 class CreateNoteRequest(BaseModel):
     title: str
     content: str = ""
@@ -230,6 +238,54 @@ async def create_task(req: CreateTaskRequest):
 async def get_stale_tasks(hours: int = 48):
     """Silence detection: tasks in progress with no activity."""
     return db.get_stale_tasks(stale_hours=hours)
+
+
+@app.get("/api/tasks/running")
+async def get_running_tasks():
+    """Get all currently running background tasks."""
+    from artimis.engine.task_runner import get_running_tasks
+    return get_running_tasks()
+
+
+@app.get("/api/tasks/silence-report")
+async def get_silence_report(hours: int = 48):
+    """Get a report of abandoned tasks (silence detection)."""
+    from artimis.engine.task_runner import get_silence_report
+    return {"report": get_silence_report()}
+
+
+@app.post("/api/tasks/submit")
+async def submit_task(req: SubmitTaskRequest):
+    """Submit a task. Optionally starts background execution immediately."""
+    from artimis.engine.task_runner import submit_task as runner_submit
+    return runner_submit(
+        title=req.title, description=req.description,
+        session_id=req.session_id, priority=req.priority,
+        run_immediately=req.run_immediately,
+    )
+
+
+@app.post("/api/tasks/{task_id}/execute")
+async def execute_task_endpoint(task_id: str):
+    """Start executing a task in the background."""
+    from artimis.engine.task_runner import run_task_background
+    task = db.get_task(task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+    if task["status"] not in ("pending", "paused"):
+        raise HTTPException(400, f"Task is {task['status']}, not pending or paused")
+    user_message = task["description"] or task["title"]
+    run_task_background(task_id, user_message, task.get("session_id"))
+    return {"task_id": task_id, "status": "running"}
+
+
+@app.post("/api/tasks/{task_id}/cancel")
+async def cancel_task_endpoint(task_id: str):
+    """Cancel a running or pending task."""
+    from artimis.engine.task_runner import cancel_task
+    if not cancel_task(task_id):
+        raise HTTPException(404, "Task not found")
+    return {"task_id": task_id, "status": "cancelled"}
 
 
 @app.get("/api/tasks/{task_id}")
