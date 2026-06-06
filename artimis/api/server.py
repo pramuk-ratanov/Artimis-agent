@@ -470,6 +470,86 @@ async def use_template(template_id: str):
     return {"used": True}
 
 
+# ─── Plugins ───────────────────────────────────────────────
+
+@app.get("/api/plugins")
+async def list_plugins(installed_only: bool = False):
+    from artimis.engine.plugins import list_plugins as plist, init_plugin_registry
+    init_plugin_registry()
+    return plist(installed_only=installed_only)
+
+
+@app.post("/api/plugins/{name}/install")
+async def install_plugin(name: str):
+    from artimis.engine.plugins import install_plugin, get_install_command
+    p = install_plugin(name)
+    if not p:
+        raise HTTPException(404, "Plugin not found")
+    cmd = get_install_command(name)
+    return {"installed": True, "name": name, "install_command": cmd}
+
+
+@app.get("/api/plugins/suggest")
+async def suggest_plugins(q: str):
+    from artimis.engine.plugins import suggest_plugins
+    return suggest_plugins(q)
+
+
+# ─── Local Model Manager ───────────────────────────────────
+
+@app.get("/api/models/hardware")
+async def get_hardware():
+    from artimis.engine.model_manager import detect_hardware
+    return detect_hardware()
+
+
+@app.get("/api/models/recommend")
+async def get_model_recommendations():
+    from artimis.engine.model_manager import recommend_models
+    return recommend_models()
+
+
+@app.get("/api/models/installed")
+async def get_installed_models():
+    from artimis.engine.model_manager import list_installed_models, check_ollama
+    return {
+        "ollama_installed": check_ollama(),
+        "models": list_installed_models(),
+    }
+
+
+class DownloadModelRequest(BaseModel):
+    model_name: str
+    method: str = "ollama"
+
+
+@app.post("/api/models/download")
+async def download_model(req: DownloadModelRequest):
+    from artimis.engine.model_manager import download_model
+    return download_model(req.model_name, req.method)
+
+
+# ─── Intelligence Layer ────────────────────────────────────
+
+@app.post("/api/sessions/{session_id}/auto-name")
+async def auto_name_session(session_id: str):
+    """Generate a name for a session from its first exchange."""
+    from artimis.engine.intelligence import auto_name_session
+    messages = db.get_messages(session_id, limit=2)
+    if len(messages) < 2:
+        raise HTTPException(400, "Need at least one exchange to auto-name")
+    user_msg = next((m["content"] for m in messages if m["role"] == "user"), "")
+    asst_msg = next((m["content"] for m in messages if m["role"] == "assistant"), "")
+    name = auto_name_session(session_id, user_msg, asst_msg)
+    return {"session_id": session_id, "name": name}
+
+
+@app.get("/api/sessions/{session_id}/orientation")
+async def get_session_orientation(session_id: str, q: str = ""):
+    from artimis.engine.intelligence import get_session_orientation
+    return {"orientation": get_session_orientation(session_id, q)}
+
+
 # ─── Health ───────────────────────────────────────────────
 
 @app.get("/api/health")

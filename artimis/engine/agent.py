@@ -171,11 +171,33 @@ def run_agent(
             continue  # Loop back to LLM with tool results
 
         # If the model responded with text (no tool calls)
+        response_text = msg.content or ""
+
+        # Intelligence checks (best-effort, don't block on failures)
+        intelligence_notes = []
+        try:
+            from artimis.engine.intelligence import check_format, self_critique, detect_drift
+            fmt = check_format(user_message, response_text)
+            if fmt:
+                intelligence_notes.append(f"Format note: {fmt['why']}")
+
+            critique = self_critique(user_message, response_text)
+            if not critique["passed"]:
+                issues = [i["check"] for i in critique["issues"]]
+                intelligence_notes.append(f"Quality notes: {', '.join(issues)}")
+
+            drift = detect_drift(user_message)
+            if drift:
+                intelligence_notes.append(f"Drift note: {drift}")
+        except Exception:
+            pass
+
         return {
-            "response": msg.content or "",
+            "response": response_text,
             "tool_calls_made": tool_calls_made,
             "iterations": iteration + 1,
             "model_used": model_name,
+            "intelligence": intelligence_notes if intelligence_notes else None,
         }
 
     # Max iterations reached
