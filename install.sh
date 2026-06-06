@@ -97,14 +97,14 @@ echo ""
 echo "Downloading Artimis..."
 
 if [ "$USE_GIT" = true ]; then
-    git clone --depth 1 "$REPO_URL" "$INSTALL_DIR/agent" 2>/dev/null || {
+    git clone --depth 1 -b master "$REPO_URL" "$INSTALL_DIR/agent" 2>/dev/null || {
         echo -e "${RED}Could not clone repository.${NC}"
         echo "  Check your internet connection and try again."
         exit 1
     }
 else
     # Fallback: download tarball
-    TARBALL_URL="https://github.com/pramuk-ratanov/Artimis-agent/archive/refs/heads/main.tar.gz"
+    TARBALL_URL="https://github.com/pramuk-ratanov/Artimis-agent/archive/refs/heads/master.tar.gz"
     TMP_DIR=$(mktemp -d)
     curl -fsSL "$TARBALL_URL" -o "$TMP_DIR/artimis.tar.gz" || {
         echo -e "${RED}Could not download Artimis.${NC}"
