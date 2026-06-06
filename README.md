@@ -35,6 +35,18 @@ python cli.py
 - A DeepSeek, OpenAI, or Anthropic API key
 - SQLite (built-in, no external database needed)
 
+## Uninstall
+
+```bash
+# Full removal (agent + all data):
+bash uninstall.sh --yes
+
+# Remove agent, keep your memories, skills, and database:
+bash uninstall.sh --keep-data
+```
+
+All Artimis files live in `~/.artimis/`. No system files are modified, no launch agents installed, no PATH changes.
+
 ## Architecture
 
 ```
