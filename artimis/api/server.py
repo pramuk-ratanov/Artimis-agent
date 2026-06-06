@@ -121,8 +121,8 @@ async def get_session_messages(session_id: str, limit: int = 100, offset: int = 
 @app.post("/api/sessions/{session_id}/messages")
 async def send_message(session_id: str, req: SendMessageRequest):
     """
-    Send a message to a session. Currently synchronous — will be upgraded
-    to SSE streaming when the agent engine is wired in (Phase 5).
+    Send a message to a session. Runs the Artimis agent loop.
+    Returns the final response after tool calling.
     """
     session = db.get_session(session_id)
     if not session:
@@ -131,8 +131,26 @@ async def send_message(session_id: str, req: SendMessageRequest):
     # Save user message
     db.add_message(session_id, "user", req.content)
 
-    # Placeholder response — agent engine integration is next phase
-    response_content = f"[Artimis engine not yet wired] Received: {req.content[:100]}..."
+    # Build conversation history from previous messages
+    messages = db.get_messages(session_id, limit=50)
+    history = []
+    for msg in messages:
+        if msg["role"] in ("user", "assistant"):
+            entry = {"role": msg["role"], "content": msg["content"]}
+            history.append(entry)
+
+    # Run the Artimis agent
+    from artimis.engine.agent import run_agent
+    result = run_agent(
+        user_message=req.content,
+        session_id=session_id,
+        conversation_history=history[:-1],  # exclude the message we just saved
+        model=session.get("model"),
+    )
+
+    response_content = result["response"]
+    if result.get("error"):
+        response_content = f"[Error: {result['error']}]\n\n{response_content}"
 
     # Save assistant response
     db.add_message(session_id, "assistant", response_content)
@@ -140,7 +158,10 @@ async def send_message(session_id: str, req: SendMessageRequest):
     return {
         "session_id": session_id,
         "role": "assistant",
-        "content": response_content
+        "content": response_content,
+        "tool_calls_made": result["tool_calls_made"],
+        "iterations": result["iterations"],
+        "model_used": result["model_used"],
     }
 
 
