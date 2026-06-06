@@ -8,16 +8,17 @@ User=%u
 WorkingDirectory=%h/.artimis/agent
 ExecStart=%h/.artimis/agent/venv/bin/python run.py --host 0.0.0.0 --port 7001
 Restart=on-failure
-RestartSec=5
+RestartSec=20
+StartLimitBurst=5
+StartLimitIntervalSec=120
 Environment=HOME=%h
 
-# Security hardening
+# Security hardening (balanced: protects system but allows agent to run)
 NoNewPrivileges=yes
 PrivateTmp=yes
-ProtectSystem=strict
+ProtectSystem=full
 ProtectHome=read-only
 ReadWritePaths=%h/.artimis
-ReadOnlyPaths=%h/.artimis/agent
 
 [Install]
 WantedBy=multi-user.target

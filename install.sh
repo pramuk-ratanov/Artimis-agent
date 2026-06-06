@@ -2,10 +2,10 @@
 # Artimis Agent — One-command installer
 #
 # Install:
-#   curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/master/install.sh | bash
 #
 # Install with systemd (VPS):
-#   curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/main/install.sh | bash -s -- --service
+#   curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/master/install.sh | bash -s -- --service
 #
 # What it does:
 #   - Clones repo into ~/.artimis/agent/
@@ -112,7 +112,8 @@ else
         exit 1
     }
     tar -xzf "$TMP_DIR/artimis.tar.gz" -C "$TMP_DIR"
-    mv "$TMP_DIR/Artimis-agent-main" "$INSTALL_DIR/agent"
+    # GitHub tarball extracts to Artimis-agent-{branch} — use glob to handle any branch name
+    mv "$TMP_DIR"/Artimis-agent-* "$INSTALL_DIR/agent"
     rm -rf "$TMP_DIR"
 fi
 
