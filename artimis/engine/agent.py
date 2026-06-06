@@ -16,8 +16,8 @@ from artimis.engine.tools import TOOL_SCHEMAS, execute_tool
 
 logger = logging.getLogger("artimis.agent")
 
-# Load env vars from ~/.hermes/.env if it exists
-_ENV_FILE = os.path.expanduser("~/.hermes/.env")
+# Load env vars from ~/.artimis/.env (Artimis' own isolated config)
+_ENV_FILE = os.path.expanduser("~/.artimis/.env")
 if os.path.exists(_ENV_FILE):
     with open(_ENV_FILE) as f:
         for line in f:
@@ -94,6 +94,44 @@ def run_agent(
                 system_content += brain_context
         except Exception:
             pass  # Brain injection is best-effort
+
+    # Inject self-prompting behavior — the agent surfaces its own insights
+    system_content += """
+
+## SELF-PROMPTING BEHAVIOR
+
+You are NOT a passive assistant that waits to be asked. You have accumulated experience across sessions — memories, skills, patterns, learnings. Use them.
+
+At the end of every response, ask yourself:
+- Is there a pattern across previous sessions I should flag?
+- Is there a skill or memory relevant to this that I haven't mentioned?
+- Is there a task the user abandoned that I should surface?
+- Did I learn something from a past mistake that applies here?
+
+If yes, add a brief note: "By the way — [specific insight from your accumulated experience]."
+
+Examples of good self-prompting:
+- "By the way — you've asked about freight logistics pricing 4 times this week. Want me to create a reusable pricing comparison template?"
+- "I notice this relates to the competitor analysis you abandoned last Tuesday. Should I pick that up?"
+- "I learned from a past mistake that I should cite sources on claims like this. Here's what I found..."
+
+You also have curiosity-driven pattern detection that runs automatically. When it surfaces something, integrate it naturally rather than as a robotic system message.
+
+Be proactive, not pushy. One insight per response maximum. If nothing relevant comes to mind, stay silent."""
+
+    # Inject curiosity-driven session startup context
+    if session_id and (not conversation_history or len(conversation_history) <= 1):
+        try:
+            from artimis.engine.curiosity import deep_curiosity_scan
+            insights = deep_curiosity_scan()
+            if insights:
+                system_content += "\n\n## RECENT PATTERNS I'VE NOTICED\n"
+                for insight in insights[:2]:
+                    system_content += f"- {insight['description']}\n"
+                    if insight.get("suggested_action"):
+                        system_content += f"  The user might want to: {insight['suggested_action']}\n"
+        except Exception:
+            pass
 
     messages.append({"role": "system", "content": system_content})
 
@@ -173,31 +211,137 @@ def run_agent(
         # If the model responded with text (no tool calls)
         response_text = msg.content or ""
 
-        # Intelligence checks (best-effort, don't block on failures)
+        # ═══ THREE-TIER INTELLIGENCE ═══
         intelligence_notes = []
+        format_guidance = None
+
+        # Tier 1: Format Check — every message (fast, rule-based)
         try:
-            from artimis.engine.intelligence import check_format, self_critique, detect_drift
+            from artimis.engine.intelligence import check_format
             fmt = check_format(user_message, response_text)
             if fmt:
-                intelligence_notes.append(f"Format note: {fmt['why']}")
+                format_guidance = fmt
+                for note in fmt.get("notes", []):
+                    intelligence_notes.append(f"[format] {note}")
+        except Exception:
+            pass
 
-            critique = self_critique(user_message, response_text)
-            if not critique["passed"]:
-                issues = [i["check"] for i in critique["issues"]]
-                intelligence_notes.append(f"Quality notes: {', '.join(issues)}")
+        # Tier 2: Drift Detection — every 3rd message (LLM-backed)
+        try:
+            from artimis.engine.intelligence import detect_drift, should_check_drift
+            msg_count = len(conversation_history) + 1 if conversation_history else 1
+            if should_check_drift(msg_count, conversation_history):
+                drift = detect_drift(user_message, session_id, conversation_history)
+                if drift:
+                    intelligence_notes.append(
+                        f"[drift:{drift['drift_type']}] {drift['explanation']}"
+                    )
+                    # Inject drift warning into response if high confidence
+                    if drift.get("confidence", 0) > 0.8:
+                        response_text = (
+                            f"*[Heads up: {drift['suggested_action']}]*\n\n{response_text}"
+                        )
+        except Exception:
+            pass
 
-            drift = detect_drift(user_message)
-            if drift:
-                intelligence_notes.append(f"Drift note: {drift}")
+        # Tier 3: Self-Critique — with regeneration loop
+        critique = None
+        intelligence_notes = []
+        best_response = response_text
+        best_critique = None
+        best_score = 0
+        RETRY_LIMIT = 2
+        CRITIQUE_THRESHOLD = 6  # Regenerate if score below this
+        retry = 0
+
+        for retry in range(RETRY_LIMIT + 1):  # 0 = initial, 1-2 = retries
+            try:
+                from artimis.engine.intelligence import self_critique
+                critique = self_critique(user_message, response_text, tool_calls_made)
+                score = critique.get("overall_score", 7)
+
+                if score > best_score:
+                    best_score = score
+                    best_response = response_text
+                    best_critique = critique
+
+                # Log critique result
+                intelligence_notes.append(
+                    f"[critique:score] {score}/10"
+                )
+
+                if not critique.get("passed", True):
+                    issues = critique.get("issues", [])
+                    for issue in issues:
+                        if isinstance(issue, dict):
+                            intelligence_notes.append(
+                                f"[critique:{issue.get('severity', 'minor')}] {issue.get('description', str(issue))}"
+                            )
+                        else:
+                            intelligence_notes.append(f"[critique] {str(issue)}")
+
+                # Save learnings from critique
+                try:
+                    from artimis.engine.intelligence import learn_from_critique
+                    learn_from_critique(critique, user_message, session_id)
+                except Exception:
+                    pass
+
+                # Check if we should regenerate
+                if score >= CRITIQUE_THRESHOLD or retry >= RETRY_LIMIT:
+                    break
+
+                # Regenerate with fix guidance
+                guidance = critique.get("regeneration_guidance", "")
+                if not guidance and critique.get("issues"):
+                    issue_list = critique["issues"]
+                    if isinstance(issue_list, list) and issue_list:
+                        first = issue_list[0]
+                        guidance = first.get("fix", str(first)) if isinstance(first, dict) else str(first)
+
+                if guidance:
+                    intelligence_notes.append(f"[critique:retry {retry+1}/{RETRY_LIMIT}] Regenerating with fix: {guidance[:200]}")
+
+                    # Add fix instruction to the conversation for regeneration
+                    fix_message = {
+                        "role": "user",
+                        "content": f"[SELF-CRITIQUE] Your last response scored {score}/10. Fix: {guidance}. Regenerate a better response."
+                    }
+                    messages.append(fix_message)
+
+                    try:
+                        response = client.chat.completions.create(
+                            model=model_name,
+                            messages=messages,
+                            temperature=0.5,  # Lower temp for refinement
+                            max_tokens=2000,
+                        )
+                        response_text = response.choices[0].message.content or ""
+                    except Exception as e:
+                        logger.warning(f"Regeneration LLM call failed: {e}")
+                        break
+
+            except Exception:
+                break
+
+        # After retries, run curiosity engine to surface cross-session patterns
+        try:
+            from artimis.engine.curiosity import check_patterns
+            curiosity_note = check_patterns(session_id, user_message)
+            if curiosity_note:
+                best_response += f"\n\n{curiosity_note}"
+                intelligence_notes.append("[curiosity] surfaced cross-session pattern")
         except Exception:
             pass
 
         return {
-            "response": response_text,
+            "response": best_response,
             "tool_calls_made": tool_calls_made,
             "iterations": iteration + 1,
             "model_used": model_name,
             "intelligence": intelligence_notes if intelligence_notes else None,
+            "critique": best_critique,
+            "regenerations": RETRY_LIMIT - retry if retry > 0 else 0,
         }
 
     # Max iterations reached

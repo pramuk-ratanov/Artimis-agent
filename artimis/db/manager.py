@@ -373,3 +373,13 @@ def increment_template_use(template_id: str):
     )
     conn.commit()
     conn.close()
+
+
+# ─── Skills ────────────────────────────────────────────────
+
+def list_skills_db() -> list[dict]:
+    """List all skills from the database."""
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM skills ORDER BY use_count DESC, updated_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]

@@ -1,0 +1,327 @@
+/* ═══════════════════════════════════════════════════════════════
+   ARTIMIS — Design Tokens & Base Styles
+   All tokens live here. No separate token file. Tailwind v4 CSS config.
+   ═══════════════════════════════════════════════════════════════ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ═══════════════════════════════════════════════════════
+   Design Tokens
+   ═══════════════════════════════════════════════════════ */
+
+@theme {
+  /* ── Signal (the single accent — muted blue, hue 240) ── */
+  --color-signal-200: oklch(0.85 0.05 240);
+  --color-signal-300: oklch(0.75 0.08 240);
+  --color-signal-400: oklch(0.65 0.10 240);
+  --color-signal-500: oklch(0.55 0.12 240);
+  --color-signal-600: oklch(0.45 0.10 240);
+  --color-signal-700: oklch(0.35 0.08 240);
+
+  /* ── Surfaces (near-black → elevated greys, hue 240, chroma 0.005) ── */
+  --color-surface-0: oklch(0.06 0.005 240);
+  --color-surface-1: oklch(0.10 0.005 240);
+  --color-surface-2: oklch(0.14 0.005 240);
+  --color-surface-3: oklch(0.18 0.005 240);
+  --color-surface-4: oklch(0.22 0.005 240);
+  --color-surface-5: oklch(0.26 0.005 240);
+
+  /* ── Ink (neutral text, zero chroma) ── */
+  --color-ink-primary: oklch(0.95 0 0);
+  --color-ink-secondary: oklch(0.70 0 0);
+  --color-ink-muted: oklch(0.45 0 0);
+  --color-ink-faint: oklch(0.25 0 0);
+
+  /* ── Status ── */
+  --color-ok: oklch(0.65 0.15 145);
+  --color-warn: oklch(0.70 0.15 75);
+  --color-error: oklch(0.55 0.18 25);
+
+  /* ── Fonts ── */
+  --font-share: "Share Tech Mono", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+
+  /* ── Type scale ── */
+  --font-size-display: 1.3125rem;
+  --font-size-heading: 0.9375rem;
+  --font-size-body: 0.8125rem;
+  --font-size-label: 0.6875rem;
+  --font-size-caption: 0.625rem;
+  --font-size-code: 0.71875rem;
+
+  /* ── Radii ── */
+  --radius-control: 4px;
+  --radius-card: 5px;
+  --radius-composer: 6px;
+
+  /* ── Easing ── */
+  --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Tailwind shadcn compat (inline theme)
+   ═══════════════════════════════════════════════════════ */
+
+@theme inline {
+  --font-heading: var(--font-sans);
+  --color-background: var(--color-surface-0);
+  --color-foreground: var(--color-ink-primary);
+  --color-card: var(--color-surface-2);
+  --color-card-foreground: var(--color-ink-primary);
+  --color-popover: var(--color-surface-2);
+  --color-popover-foreground: var(--color-ink-primary);
+  --color-primary: var(--color-signal-600);
+  --color-primary-foreground: var(--color-ink-primary);
+  --color-secondary: var(--color-surface-1);
+  --color-secondary-foreground: var(--color-ink-secondary);
+  --color-muted: var(--color-surface-1);
+  --color-muted-foreground: var(--color-ink-muted);
+  --color-accent: var(--color-signal-400);
+  --color-accent-foreground: var(--color-ink-primary);
+  --color-destructive: var(--color-error);
+  --color-border: var(--color-surface-3);
+  --color-input: var(--color-surface-1);
+  --color-ring: oklch(0.55 0.12 240 / 0.35);
+  --color-sidebar: var(--color-surface-1);
+  --color-sidebar-foreground: var(--color-ink-secondary);
+  --color-sidebar-primary: var(--color-signal-600);
+  --color-sidebar-primary-foreground: var(--color-ink-primary);
+  --color-sidebar-accent: var(--color-surface-2);
+  --color-sidebar-accent-foreground: var(--color-ink-primary);
+  --color-sidebar-border: var(--color-surface-3);
+  --color-sidebar-ring: oklch(0.55 0.12 240 / 0.2);
+  --radius: var(--radius-control);
+  --radius-sm: 4px;
+  --radius-md: var(--radius-card);
+  --radius-lg: var(--radius-composer);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Reset
+   ═══════════════════════════════════════════════════════ */
+
+*, *::before, *::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-share);
+  font-weight: 400;
+  font-size: var(--font-size-body);
+  line-height: 1.65;
+  letter-spacing: 0.01em;
+  color: var(--color-ink-primary);
+  background: var(--color-surface-0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Scrollbar
+   ═══════════════════════════════════════════════════════ */
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-surface-5); }
+::-webkit-scrollbar-thumb:hover { background: var(--color-signal-700); }
+
+/* ═══════════════════════════════════════════════════════
+   Selection
+   ═══════════════════════════════════════════════════════ */
+
+::selection {
+  background: oklch(0.55 0.12 240 / 0.25);
+  color: var(--color-ink-primary);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Focus
+   ═══════════════════════════════════════════════════════ */
+
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--color-signal-500);
+  outline-offset: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════
+   Keyframes
+   ═══════════════════════════════════════════════════════ */
+
+@keyframes signal-breath {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes signal-pulse {
+  0%, 100% { opacity: 0.95; transform: scale(0.95); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+
+@keyframes caret-blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.animate-signal-breath { animation: signal-breath 4s ease-in-out infinite; }
+.animate-signal-pulse  { animation: signal-pulse 1.2s ease-in-out infinite; }
+.caret-blink { animation: caret-blink 1s step-end infinite; }
+.animate-fade-up { animation: fade-up 300ms var(--ease-expo-out) forwards; }
+.animate-fade-up-delay-1 { animation-delay: 60ms; }
+.animate-fade-up-delay-2 { animation-delay: 120ms; }
+
+/* ═══════════════════════════════════════════════════════
+   Utility classes
+   ═══════════════════════════════════════════════════════ */
+
+/* Main heading override — the only element that gets system sans */
+.heading-default {
+  font-family: var(--font-sans) !important;
+}
+
+/* Type scale utilities */
+.text-display  { font-size: var(--font-size-display); }
+.text-heading  { font-size: var(--font-size-heading); }
+.text-body     { font-size: var(--font-size-body); }
+.text-label    { font-size: var(--font-size-label); }
+.text-caption  { font-size: var(--font-size-caption); }
+.text-code     { font-size: var(--font-size-code); }
+
+/* Radius utilities */
+.rounded-control  { border-radius: var(--radius-control); }
+.rounded-card     { border-radius: var(--radius-card); }
+.rounded-composer { border-radius: var(--radius-composer); }
+
+/* Easing utility */
+.ease-expo-out { transition-timing-function: var(--ease-expo-out); }
+
+/* ═══════════════════════════════════════════════════════
+   Sidebar item — selected/unselected pattern
+   ═══════════════════════════════════════════════════════ */
+
+.sidebar-item {
+  transition: background 150ms var(--ease-expo-out),
+              color 150ms var(--ease-expo-out),
+              border-color 150ms var(--ease-expo-out);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Chat messages
+   ═══════════════════════════════════════════════════════ */
+
+.msg-turn {
+  max-width: 65ch;
+}
+
+/* Markdown rendered content */
+.msg-content h1, .msg-content h2, .msg-content h3 {
+  font-weight: 600;
+  margin-top: 1em;
+  margin-bottom: 0.35em;
+  color: var(--color-ink-primary);
+}
+
+.msg-content h1 { font-size: 1.25rem; }
+.msg-content h2 { font-size: 1.1rem; }
+.msg-content h3 { font-size: 1rem; }
+
+.msg-content p { margin-bottom: 0.5em; }
+.msg-content p:last-child { margin-bottom: 0; }
+
+.msg-content code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-code);
+  background: var(--color-surface-2);
+  padding: 1px 5px;
+  border: 1px solid var(--color-surface-3);
+  border-radius: 4px;
+  color: var(--color-signal-300);
+}
+
+.msg-content pre {
+  background: var(--color-surface-1);
+  border: 1px solid var(--color-surface-3);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+
+.msg-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-ink-secondary);
+}
+
+.msg-content ul, .msg-content ol { padding-left: 1.3em; margin-bottom: 0.5em; }
+.msg-content li { margin-bottom: 0.15em; }
+.msg-content strong { font-weight: 700; color: var(--color-ink-primary); }
+
+.msg-content blockquote {
+  border-left: 2px solid var(--color-surface-3);
+  padding-left: 10px;
+  margin: 0.5em 0;
+  color: var(--color-ink-secondary);
+  font-style: italic;
+}
+
+.msg-content hr {
+  border: none;
+  border-top: 1px solid var(--color-surface-3);
+  margin: 0.8em 0;
+}
+
+.msg-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.7em 0;
+  font-size: 0.875rem;
+}
+
+.msg-content th {
+  text-align: left;
+  padding: 5px 10px;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-surface-3);
+  font-weight: 600;
+  color: var(--color-ink-secondary);
+}
+
+.msg-content td {
+  padding: 4px 10px;
+  border-bottom: 1px solid oklch(0.14 0.005 240);
+  color: var(--color-ink-primary);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Reduced motion
+   ═══════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-signal-breath,
+  .animate-signal-pulse { animation: none; }
+  .animate-fade-up { animation: none; opacity: 1; transform: none; }
+  .caret-blink { animation: none; opacity: 1; }
+  *, *::before, *::after {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+  }
+}

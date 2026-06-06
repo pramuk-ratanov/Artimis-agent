@@ -5,10 +5,12 @@ The API layer between the web UI and the Artimis engine.
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
 import json
+import os
 
 from artimis.db.schema import init_db
 from artimis.db import manager as db
@@ -32,6 +34,17 @@ class CreateSessionRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     content: str
+
+
+class AgentRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
+
+class DeepResearchRequest(BaseModel):
+    task: str
+    session_id: Optional[str] = None
+    max_iterations: int = 2
 
 
 class CreateMemoryRequest(BaseModel):
@@ -85,6 +98,12 @@ class CreateTemplateRequest(BaseModel):
 @app.on_event("startup")
 async def startup():
     init_db()
+    # Start background notification poller
+    try:
+        from artimis.engine.notifications import start_polling
+        start_polling(interval_seconds=30)
+    except Exception:
+        pass  # Non-critical
 
 
 # ─── Sessions ─────────────────────────────────────────────
@@ -170,6 +189,79 @@ async def send_message(session_id: str, req: SendMessageRequest):
         "tool_calls_made": result["tool_calls_made"],
         "iterations": result["iterations"],
         "model_used": result["model_used"],
+    }
+
+
+@app.post("/api/agent")
+async def agent_endpoint(req: AgentRequest):
+    """
+    Simplified agent endpoint for the Web UI.
+    Auto-creates or reuses sessions. Returns {response, session_id}.
+    """
+    from artimis.engine.agent import run_agent
+
+    session_id: str = req.session_id or ""
+    session = None
+
+    if session_id:
+        session = db.get_session(session_id)
+
+    if not session:
+        session = db.create_session()
+        session_id = session["id"]
+
+    # Save user message
+    db.add_message(session_id, "user", req.message)
+
+    # Build history
+    messages = db.get_messages(session_id, limit=50)
+    history = []
+    for msg in messages:
+        if msg["role"] in ("user", "assistant"):
+            history.append({"role": msg["role"], "content": msg["content"]})
+
+    result = run_agent(
+        user_message=req.message,
+        session_id=session_id,
+        conversation_history=history[:-1],
+        model=session.get("model"),
+    )
+
+    response_text = result["response"]
+    if result.get("error"):
+        response_text = f"[Error: {result['error']}]\n\n{response_text}"
+
+    db.add_message(session_id, "assistant", response_text)
+
+    return {
+        "response": response_text,
+        "session_id": session_id,
+        "tool_calls_made": result.get("tool_calls_made", 0),
+        "model_used": result.get("model_used"),
+    }
+
+
+@app.post("/api/deep-research")
+async def deep_research_endpoint(req: DeepResearchRequest):
+    """
+    Run the full deep research pipeline: plan → retrieve → verify → synthesize.
+    Returns a research memo with citations and confidence assessment.
+    """
+    from artimis.engine.deep_research import deep_research
+
+    result = deep_research(
+        task=req.task,
+        session_id=req.session_id,
+        max_iterations=req.max_iterations,
+    )
+
+    return {
+        "task": result["task"],
+        "synthesis": result["synthesis"],
+        "confidence": result["confidence"],
+        "iterations": result["iterations"],
+        "retrieval_count": result["retrieval_count"],
+        "gaps": result["gaps"],
     }
 
 
@@ -550,8 +642,67 @@ async def get_session_orientation(session_id: str, q: str = ""):
     return {"orientation": get_session_orientation(session_id, q)}
 
 
+# ─── Notifications ──────────────────────────────────────────
+
+class WebhookRequest(BaseModel):
+    url: str
+
+
+@app.get("/api/notifications")
+async def get_notifications():
+    """Return recent notifications for the Web UI."""
+    from artimis.engine.notifications import (
+        check_task_completions, check_stale_tasks, check_silence
+    )
+    notifications = []
+    notifications.extend(check_task_completions())
+    notifications.extend(check_stale_tasks())
+    notifications.extend(check_silence())
+    return sorted(notifications, key=lambda n: n.get("timestamp", ""), reverse=True)[:20]
+
+
+@app.post("/api/notifications/webhooks")
+async def add_webhook(req: WebhookRequest):
+    """Register a webhook URL for notifications."""
+    from artimis.engine.notifications import add_webhook as add_hook
+    add_hook(req.url)
+    return {"webhooks": "registered"}
+
+
+@app.delete("/api/notifications/webhooks")
+async def remove_webhook(req: WebhookRequest):
+    """Remove a webhook URL."""
+    from artimis.engine.notifications import remove_webhook as rm_hook
+    rm_hook(req.url)
+    return {"webhooks": "removed"}
+
+
 # ─── Health ───────────────────────────────────────────────
 
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "version": "0.1.0"}
+
+
+# ─── Web UI (static files, served after API routes) ─────────
+
+WEB_DIST = os.path.join(os.path.dirname(__file__), "..", "..", "web", "dist")
+
+if os.path.isdir(WEB_DIST):
+    # Mount assets at /assets/
+    assets_dir = os.path.join(WEB_DIST, "assets")
+    if os.path.isdir(assets_dir):
+        app.mount("/assets", StaticFiles(directory=assets_dir), name="assets")
+
+    # Serve index.html for root and SPA fallback
+    @app.get("/")
+    async def serve_spa():
+        return FileResponse(os.path.join(WEB_DIST, "index.html"))
+
+    @app.get("/{full_path:path}")
+    async def serve_spa_fallback(full_path: str):
+        # Only serve static files for non-API paths
+        file_path = os.path.join(WEB_DIST, full_path)
+        if os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(WEB_DIST, "index.html"))
