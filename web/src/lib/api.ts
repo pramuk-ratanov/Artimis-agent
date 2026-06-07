@@ -215,6 +215,13 @@ export function deleteSession(id: string) {
   return fetchJSON<{ deleted: true }>(`/api/sessions/${id}`, { method: "DELETE" })
 }
 
+export function updateSession(id: string, data: { name?: string; status?: string }) {
+  return fetchJSON<Session>(`/api/sessions/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  })
+}
+
 export function getSessionMessages(id: string, limit = 100, offset = 0) {
   return fetchJSON<Message[]>(`/api/sessions/${id}/messages?limit=${limit}&offset=${offset}`)
 }
@@ -229,6 +236,50 @@ export function sendAgentMessage(message: string, sessionId?: string) {
   return fetchJSON<AgentResponse>("/api/agent", {
     method: "POST",
     body: JSON.stringify({ message, session_id: sessionId }),
+  })
+}
+
+/** Stream an agent response via SSE. Returns a ReadableStream of parsed events. */
+export function streamAgentMessage(message: string, sessionId?: string): Promise<ReadableStream<SSEEvent>> {
+  return fetch("/api/agent/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message, session_id: sessionId }),
+  }).then(res => {
+    if (!res.ok) throw new Error(`Stream failed: ${res.status}`)
+    return res.body!.pipeThrough(new TextDecoderStream()).pipeThrough(parseSSE())
+  })
+}
+
+export interface SSEEvent {
+  type: "tool" | "token" | "start" | "done" | "error"
+  name?: string
+  content?: string
+  tool_calls_made?: number
+  model?: string
+  session_id?: string
+}
+
+/** Transform stream: splits SSE text into parsed JSON events */
+function parseSSE(): TransformStream<string, SSEEvent> {
+  let buffer = ""
+  return new TransformStream({
+    transform(chunk, controller) {
+      buffer += chunk
+      const lines = buffer.split("\n")
+      buffer = lines.pop() || ""
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(line.slice(6))
+            controller.enqueue(data as SSEEvent)
+          } catch {
+            // Skip malformed chunks
+          }
+        }
+      }
+    }
   })
 }
 
@@ -481,6 +532,32 @@ export function getStats() {
   return fetchJSON<StatsSummary>("/api/stats")
 }
 
+// ── Conversation constellation graph ──
+
+export interface GraphNode {
+  id: string
+  label: string
+  topic: string
+  messages: number
+  size: number
+}
+
+export interface GraphEdge {
+  source: string
+  target: string
+  weight: number
+  reason: string
+}
+
+export interface ConversationGraph {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+export function getConversationGraph(limit = 60) {
+  return fetchJSON<ConversationGraph>(`/api/stats/graph?limit=${limit}`)
+}
+
 // ── Custom Agents ──
 
 export interface CustomAgent {
@@ -508,4 +585,31 @@ export function updateAgent(id: string, data: Partial<CustomAgent>) {
 
 export function deleteAgent(id: string) {
   return fetchJSON<{ deleted: true }>(`/api/agents/${id}`, { method: "DELETE" })
+}
+
+// ── Files ──
+
+export interface UploadedFile {
+  id: string
+  filename: string
+  original_name: string
+  mime_type: string
+  size_bytes: number
+  storage_path: string
+  created_at: string
+}
+
+export function uploadFiles(files: FileList | File[]): Promise<{ uploaded: { id: string; original_name: string; mime_type: string; size_bytes: number }[]; count: number }> {
+  const form = new FormData()
+  const arr = Array.from(files)
+  arr.forEach(f => form.append("files", f))
+  return fetch("/api/files/upload", { method: "POST", body: form }).then(r => r.json())
+}
+
+export function getFiles() {
+  return fetchJSON<UploadedFile[]>("/api/files")
+}
+
+export function deleteFile(id: string) {
+  return fetchJSON<{ deleted: true }>(`/api/files/${id}`, { method: "DELETE" })
 }

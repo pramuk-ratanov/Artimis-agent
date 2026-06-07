@@ -924,6 +924,107 @@ async def get_statistics():
     }
 
 
+# Topic taxonomy reused for node coloring + relevance scoring
+_GRAPH_TOPICS = {
+    "coding": ["code", "function", "api", "build", "component", "react", "python", "typescript", "error", "fix", "implement", "refactor", "bug", "deploy"],
+    "ai": ["prompt", "model", "llm", "agent", "generat", "gpt", "claude", "deepseek", "openrouter", "harness"],
+    "design": ["design", "ui", "ux", "css", "style", "layout", "color", "button", "sidebar", "card", "theme", "palette"],
+    "business": ["marketing", "lead", "client", "sales", "campaign", "freight", "logistics", "shipping", "brand"],
+    "infra": ["server", "deploy", "docker", "database", "endpoint", "config", "port", "sqlite", "container", "volume"],
+}
+
+# Words ignored when computing session-to-session relevance overlap
+_GRAPH_STOPWORDS = set("""
+the a an and or but if then else for to of in on at by with from into is are was were be been being
+this that these those it its as so not no yes do does did can could should would will just like get got
+i you he she we they me him her us them my your our their what which who when where why how all any some
+""".split())
+
+
+@app.get("/api/stats/graph")
+async def get_conversation_graph(limit: int = 60):
+    """
+    Conversation constellation: each session is a node, edges connect sessions
+    that share significant vocabulary (topic relevance). Returns:
+      nodes: [{id, label, topic, size, messages}]
+      edges: [{source, target, weight, reason}]
+    The frontend renders nodes as a star-field and sweeps an ember pulse along
+    each edge to show node-to-node relevance.
+    """
+    db = get_db()
+    rows = db.execute(
+        "SELECT id, name, created_at FROM sessions ORDER BY created_at DESC LIMIT ?",
+        (limit,),
+    ).fetchall()
+
+    import re
+
+    nodes = []
+    session_words: dict[str, set] = {}     # session_id -> significant word set
+    session_topic: dict[str, str] = {}     # session_id -> dominant topic
+
+    for r in rows:
+        sid = r["id"]
+        msgs = db.execute(
+            "SELECT content FROM messages WHERE session_id=? AND role IN ('user','assistant')",
+            (sid,),
+        ).fetchall()
+        text = " ".join((m["content"] or "") for m in msgs).lower()
+        msg_count = len(msgs)
+
+        # Significant words (>=4 chars, not stopwords) for overlap scoring
+        words = {
+            w for w in re.findall(r"[a-z][a-z0-9]{3,}", text)
+            if w not in _GRAPH_STOPWORDS
+        }
+        session_words[sid] = words
+
+        # Dominant topic by keyword hits → node color
+        best_topic, best_hits = "general", 0
+        for topic, kws in _GRAPH_TOPICS.items():
+            hits = sum(text.count(kw) for kw in kws)
+            if hits > best_hits:
+                best_topic, best_hits = topic, hits
+        session_topic[sid] = best_topic
+
+        nodes.append({
+            "id": sid,
+            "label": r["name"] or "Untitled",
+            "topic": best_topic,
+            "messages": msg_count,
+            "size": min(1.0, 0.25 + msg_count / 20.0),  # 0.25..1.0 for radius scaling
+        })
+
+    # Edges: Jaccard-style overlap of significant vocab between session pairs
+    ids = list(session_words.keys())
+    edges = []
+    for i in range(len(ids)):
+        for j in range(i + 1, len(ids)):
+            a, b = session_words[ids[i]], session_words[ids[j]]
+            if not a or not b:
+                continue
+            shared = a & b
+            if len(shared) < 3:
+                continue
+            union = len(a | b) or 1
+            weight = round(len(shared) / union, 3)
+            if weight < 0.06:   # prune weak links to keep the graph readable
+                continue
+            top_shared = sorted(shared, key=lambda w: -(len(w)))[:3]
+            edges.append({
+                "source": ids[i],
+                "target": ids[j],
+                "weight": weight,
+                "reason": ", ".join(top_shared),
+            })
+
+    # Keep the strongest edges only (avoid hairball)
+    edges.sort(key=lambda e: -e["weight"])
+    edges = edges[: max(40, len(nodes) * 2)]
+
+    return {"nodes": nodes, "edges": edges}
+
+
 # ─── Custom Agents ─────────────────────────────────────────
 
 @app.get("/api/agents")

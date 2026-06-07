@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import * as api from "@/lib/api"
+import { ConversationConstellation } from "@/components/panels/conversation-constellation"
 
 type SkillStat = { name: string; value: number }
 type FocusStat = { topic: string; sessions: number; messages: number; percentage: number }
@@ -19,30 +20,33 @@ export function StatisticsPanel() {
     api.getStats().then(s => { setData(s); setLoading(false) }).catch(() => setLoading(false))
   }, [])
 
-  if (loading) return <div className="p-8 text-ink-muted font-sans">Loading statistics...</div>
-  if (!data) return <div className="p-8 text-ink-muted font-sans">No data available yet. Start conversations to build statistics.</div>
+  if (loading) return <div className="p-8 text-ink-muted font-share">Loading statistics...</div>
+  if (!data) return <div className="p-8 text-ink-muted font-share">No data available yet. Start conversations to build statistics.</div>
 
   const focusConfig: ChartConfig = {}
   data.focusAreas.forEach((f, i) => { focusConfig[f.topic] = { label: f.topic, color: COLORS[i % COLORS.length] } })
 
   return (
-    <div className="p-6 space-y-8 overflow-y-auto h-full font-sans">
+    <div className="p-6 space-y-8 overflow-y-auto h-full font-share">
       <h2 className="text-display font-share tracking-wider text-ink-primary">Statistics</h2>
 
       {/* Summary cards */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: "Sessions", value: data.totalSessions },
-          { label: "Messages", value: data.totalMessages },
-          { label: "Memories", value: data.totalMemories },
-          { label: "Skills", value: data.totalSkills },
+          { label: "Sessions", value: data.totalSessions, accent: "text-signal-400" },
+          { label: "Messages", value: data.totalMessages, accent: "text-ember-400" },
+          { label: "Memories", value: data.totalMemories, accent: "text-signal-400" },
+          { label: "Skills", value: data.totalSkills, accent: "text-ember-400" },
         ].map(s => (
-          <div key={s.label} className="rounded-card bg-surface-2 border border-surface-3 p-4 text-center">
-            <div className="text-display font-share text-signal-400">{s.value}</div>
+          <div key={s.label} className="rounded-card card-hover-lift bg-surface-2 border border-surface-3 p-4 text-center">
+            <div className={`text-display font-share ${s.accent}`}>{s.value}</div>
             <div className="text-label text-ink-muted mt-1">{s.label}</div>
           </div>
         ))}
       </div>
+
+      {/* Conversation constellation — node-to-node relevance graph */}
+      <ConversationConstellation />
 
       {/* Focus areas bar chart */}
       <div>

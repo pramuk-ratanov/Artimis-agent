@@ -1,0 +1,267 @@
+/**
+ * ConversationConstellation
+ * --------------------------
+ * Star-field of conversation nodes. Each session is a node (sized by message
+ * count, colored by dominant topic). Edges connect sessions that share
+ * significant vocabulary; an EMBER pulse sweeps along each edge to visualize
+ * node-to-node relevance — the warm counter-pole to the cool signal-blue nodes.
+ *
+ * Canvas-rendered with a light force-directed layout. No external graph deps.
+ */
+import { useEffect, useRef, useState } from "react"
+import * as api from "@/lib/api"
+import type { GraphNode, GraphEdge } from "@/lib/api"
+
+// Topic → OKLCH color. Cool blues for system/AI/infra, warm ember for the
+// human/business side, neutral for general.
+const TOPIC_COLOR: Record<string, string> = {
+  coding: "oklch(0.62 0.10 230)",   // signal blue
+  ai: "oklch(0.70 0.09 200)",       // cyan-blue
+  design: "oklch(0.68 0.12 300)",   // violet
+  business: "oklch(0.68 0.12 60)",  // ember (warm)
+  infra: "oklch(0.60 0.08 160)",    // teal-green
+  general: "oklch(0.55 0.01 60)",   // warm grey
+}
+
+const EMBER = "oklch(0.68 0.13 60)"
+const EMBER_FAINT = "oklch(0.50 0.06 60)"
+
+interface PNode extends GraphNode {
+  x: number
+  y: number
+  vx: number
+  vy: number
+}
+
+export function ConversationConstellation() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [graph, setGraph] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] }>({ nodes: [], edges: [] })
+  const [loading, setLoading] = useState(true)
+  const [hover, setHover] = useState<string | null>(null)
+  const hoverRef = useRef<string | null>(null)
+  const nodesRef = useRef<PNode[]>([])
+  const rafRef = useRef<number>(0)
+
+  useEffect(() => {
+    api.getConversationGraph()
+      .then(g => { setGraph(g); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [])
+
+  useEffect(() => { hoverRef.current = hover }, [hover])
+
+  // Initialize node positions + run a brief force-directed settle, then animate.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext("2d")
+    if (!ctx) return
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1
+      const rect = canvas.getBoundingClientRect()
+      canvas.width = rect.width * dpr
+      canvas.height = rect.height * dpr
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+    }
+    resize()
+    window.addEventListener("resize", resize)
+
+    const rect = canvas.getBoundingClientRect()
+    const W = rect.width, H = rect.height
+    const cx = W / 2, cy = H / 2
+
+    // Seed positions on a loose circle
+    const pnodes: PNode[] = graph.nodes.map((n, i) => {
+      const a = (i / Math.max(1, graph.nodes.length)) * Math.PI * 2
+      const r = Math.min(W, H) * 0.32
+      return { ...n, x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r, vx: 0, vy: 0 }
+    })
+    nodesRef.current = pnodes
+    const byId = new Map(pnodes.map(n => [n.id, n]))
+
+    // Edge lookup for hover-highlight + neighbor set
+    const neighbors = new Map<string, Set<string>>()
+    graph.edges.forEach(e => {
+      if (!neighbors.has(e.source)) neighbors.set(e.source, new Set())
+      if (!neighbors.has(e.target)) neighbors.set(e.target, new Set())
+      neighbors.get(e.source)!.add(e.target)
+      neighbors.get(e.target)!.add(e.source)
+    })
+
+    // Mouse → hover detection
+    const onMove = (ev: MouseEvent) => {
+      const b = canvas.getBoundingClientRect()
+      const mx = ev.clientX - b.left, my = ev.clientY - b.top
+      let found: string | null = null
+      let best = 18
+      for (const n of nodesRef.current) {
+        const d = Math.hypot(n.x - mx, n.y - my)
+        if (d < best) { best = d; found = n.id }
+      }
+      if (found !== hoverRef.current) setHover(found)
+    }
+    const onLeave = () => setHover(null)
+    canvas.addEventListener("mousemove", onMove)
+    canvas.addEventListener("mouseleave", onLeave)
+
+    let t = 0
+    const start = performance.now()
+
+    const tick = (now: number) => {
+      t = (now - start) / 1000
+
+      // Light physics: repulsion between nodes + spring on edges + gentle center pull
+      const SETTLE = t < 2.5 ? 1 : 0.04 // settle fast, then near-freeze for calm drift
+      for (let i = 0; i < pnodes.length; i++) {
+        const a = pnodes[i]
+        for (let j = i + 1; j < pnodes.length; j++) {
+          const b = pnodes[j]
+          let dx = a.x - b.x, dy = a.y - b.y
+          let d2 = dx * dx + dy * dy || 1
+          const f = (2200 / d2) * SETTLE
+          const d = Math.sqrt(d2)
+          a.vx += (dx / d) * f; a.vy += (dy / d) * f
+          b.vx -= (dx / d) * f; b.vy -= (dy / d) * f
+        }
+        // center pull
+        a.vx += (cx - a.x) * 0.0015 * SETTLE
+        a.vy += (cy - a.y) * 0.0015 * SETTLE
+      }
+      graph.edges.forEach(e => {
+        const a = byId.get(e.source), b = byId.get(e.target)
+        if (!a || !b) return
+        const dx = b.x - a.x, dy = b.y - a.y
+        const dist = Math.hypot(dx, dy) || 1
+        const target = 120
+        const f = (dist - target) * 0.002 * (0.4 + e.weight) * SETTLE
+        a.vx += (dx / dist) * f; a.vy += (dy / dist) * f
+        b.vx -= (dx / dist) * f; b.vy -= (dy / dist) * f
+      })
+      pnodes.forEach(n => {
+        n.vx *= 0.82; n.vy *= 0.82
+        n.x += n.vx; n.y += n.vy
+        n.x = Math.max(20, Math.min(W - 20, n.x))
+        n.y = Math.max(20, Math.min(H - 20, n.y))
+      })
+
+      // ── Render ──
+      ctx.clearRect(0, 0, W, H)
+      const hv = hoverRef.current
+      const hvSet = hv ? neighbors.get(hv) : null
+
+      // Edges + sweeping ember pulse
+      graph.edges.forEach((e, idx) => {
+        const a = byId.get(e.source), b = byId.get(e.target)
+        if (!a || !b) return
+        const active = !hv || e.source === hv || e.target === hv
+        ctx.strokeStyle = active
+          ? `oklch(0.40 0.04 230 / ${0.25 + e.weight * 0.5})`
+          : "oklch(0.30 0.01 60 / 0.07)"
+        ctx.lineWidth = active ? 0.6 + e.weight * 1.4 : 0.4
+        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+
+        // Ember pulse: a bright dot sweeping along the edge. Phase offset per
+        // edge so they don't fire in lockstep. Pulses on active edges only.
+        if (active) {
+          const speed = 0.35 + e.weight * 0.4
+          const phase = (t * speed + (idx * 0.137)) % 1
+          const px = a.x + (b.x - a.x) * phase
+          const py = a.y + (b.y - a.y) * phase
+          const glow = hv ? 1 : 0.6
+          const g = ctx.createRadialGradient(px, py, 0, px, py, 6)
+          g.addColorStop(0, EMBER)
+          g.addColorStop(1, "oklch(0.68 0.13 60 / 0)")
+          ctx.fillStyle = g
+          ctx.globalAlpha = glow
+          ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill()
+          ctx.globalAlpha = 1
+        }
+      })
+
+      // Nodes
+      pnodes.forEach(n => {
+        const r = 3 + n.size * 7
+        const isHover = n.id === hv
+        const isNeighbor = hvSet?.has(n.id)
+        const dim = hv && !isHover && !isNeighbor
+        const color = TOPIC_COLOR[n.topic] || TOPIC_COLOR.general
+
+        // soft glow
+        ctx.globalAlpha = dim ? 0.15 : 1
+        const halo = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3)
+        halo.addColorStop(0, isHover ? EMBER_FAINT : color)
+        halo.addColorStop(1, "oklch(0 0 0 / 0)")
+        ctx.fillStyle = halo
+        ctx.beginPath(); ctx.arc(n.x, n.y, r * 3, 0, Math.PI * 2); ctx.fill()
+
+        // core
+        ctx.fillStyle = isHover ? EMBER : color
+        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill()
+        ctx.globalAlpha = 1
+      })
+
+      // Hover label
+      if (hv) {
+        const n = byId.get(hv)
+        if (n) {
+          ctx.font = "11px 'Share Tech Mono', monospace"
+          const text = n.label.length > 40 ? n.label.slice(0, 40) + "…" : n.label
+          const tw = ctx.measureText(text).width
+          const lx = Math.min(W - tw - 16, n.x + 12)
+          const ly = n.y - 12
+          ctx.fillStyle = "oklch(0.16 0.003 30 / 0.92)"
+          ctx.fillRect(lx - 6, ly - 12, tw + 12, 20)
+          ctx.fillStyle = "oklch(0.93 0.002 60)"
+          ctx.fillText(text, lx, ly + 2)
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(tick)
+    }
+    rafRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      cancelAnimationFrame(rafRef.current)
+      window.removeEventListener("resize", resize)
+      canvas.removeEventListener("mousemove", onMove)
+      canvas.removeEventListener("mouseleave", onLeave)
+    }
+  }, [graph])
+
+  return (
+    <div className="font-share rounded-card border border-surface-3 bg-surface-1 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3">
+        <div>
+          <h3 className="text-heading text-ink-primary">Conversation Constellation</h3>
+          <p className="text-caption text-ink-muted mt-0.5">
+            Nodes are chats · ember pulses sweep between related conversations
+          </p>
+        </div>
+        <div className="flex items-center gap-3 text-caption text-ink-muted">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-signal-400" />
+            chats
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-2 h-2 rounded-full bg-ember-400" />
+            relevance
+          </span>
+        </div>
+      </div>
+      <div className="relative" style={{ height: 420 }}>
+        {loading ? (
+          <div className="absolute inset-0 grid place-items-center text-caption text-ink-muted">
+            mapping conversations…
+          </div>
+        ) : graph.nodes.length === 0 ? (
+          <div className="absolute inset-0 grid place-items-center text-caption text-ink-muted">
+            No conversations yet — start chatting to grow the constellation
+          </div>
+        ) : (
+          <canvas ref={canvasRef} className="w-full h-full block" />
+        )}
+      </div>
+    </div>
+  )
+}

@@ -14,13 +14,24 @@
    ═══════════════════════════════════════════════════════ */
 
 @theme {
-  /* ── Signal (single accent — pale blue, restrained chroma) ── */
+  /* ── Signal (primary accent — pale blue, restrained chroma) ── */
   --color-signal-200: oklch(0.82 0.04 230);
   --color-signal-300: oklch(0.70 0.06 230);
   --color-signal-400: oklch(0.58 0.08 230);
   --color-signal-500: oklch(0.48 0.10 230);
   --color-signal-600: oklch(0.38 0.08 230);
   --color-signal-700: oklch(0.28 0.06 230);
+
+  /* ── Ember (secondary accent — warm amber/copper, hue 60).
+        The warm counter-pole to the cool signal blue. Same warm family as
+        the surfaces/ink so it sits on-brand. Used for: relevance/activity,
+        node-graph pulses, the "human" side of the cool/warm tension. ── */
+  --color-ember-200: oklch(0.84 0.06 65);
+  --color-ember-300: oklch(0.76 0.09 62);
+  --color-ember-400: oklch(0.68 0.12 60);
+  --color-ember-500: oklch(0.60 0.13 58);
+  --color-ember-600: oklch(0.48 0.11 56);
+  --color-ember-700: oklch(0.36 0.08 55);
 
   /* ── Surfaces (warm off-blacks → elevated, hue shifted to 30 for warmth) ── */
   --color-surface-0: oklch(0.08 0.003 30);
@@ -190,12 +201,33 @@ body {
   100% { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes typing-dot {
+  0%, 60%, 100% { opacity: 0.2; transform: scale(0.8); }
+  30% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes cursor-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .animate-signal-breath { animation: signal-breath 5s ease-in-out infinite; }
 .animate-signal-pulse  { animation: signal-pulse 1.5s ease-in-out infinite; }
 .caret-blink { animation: caret-blink 1s step-end infinite; }
 .animate-fade-up { animation: fade-up 250ms var(--ease-expo-out) forwards; }
 .animate-fade-up-delay-1 { animation-delay: 50ms; }
 .animate-fade-up-delay-2 { animation-delay: 100ms; }
+.animate-typing-dot { animation: typing-dot 1.2s ease-in-out infinite; }
+
+.typing-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: var(--color-signal-400);
+  margin-left: 1px;
+  vertical-align: text-bottom;
+  animation: cursor-pulse 800ms ease-in-out infinite;
+}
 
 /* ═══════════════════════════════════════════════════════
    Utility classes
@@ -321,6 +353,132 @@ body {
   padding: 5px 12px;
   border-bottom: 1px solid var(--color-surface-3);
   color: var(--color-ink-primary);
+}
+
+/* Code block with header and copy button */
+.code-block {
+  margin: 0.6em 0;
+  border: 1px solid var(--color-surface-3);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: var(--color-surface-2);
+  border-bottom: 1px solid var(--color-surface-3);
+}
+
+.code-lang {
+  font-size: var(--font-size-caption);
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.code-copy-btn {
+  font-size: var(--font-size-caption);
+  font-family: var(--font-mono);
+  color: var(--color-ink-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.code-copy-btn:hover {
+  color: var(--color-signal-400);
+}
+
+.code-block pre {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+}
+
+.inline-code {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-code);
+  background: var(--color-surface-2);
+  padding: 1px 5px;
+  border: 1px solid var(--color-surface-3);
+  border-radius: 4px;
+  color: var(--color-signal-300);
+}
+
+/* Message groups — subtle separation between different roles */
+.msg-group + .msg-group {
+  padding-top: 0;
+}
+
+/* ── Card hover lift — micro-elevation + border glow ── */
+.card-hover-lift {
+  transition: transform 180ms var(--ease-expo-out),
+              border-color 180ms var(--ease-expo-out),
+              box-shadow 180ms var(--ease-expo-out);
+}
+
+.card-hover-lift:hover {
+  transform: translateY(-1px);
+  border-color: oklch(0.58 0.08 230 / 0.3);
+  box-shadow: 0 2px 12px oklch(0.58 0.08 230 / 0.06);
+}
+
+/* ── Toast notifications ── */
+@keyframes toast-in {
+  0% { opacity: 0; transform: translateX(20px) translateY(10px); }
+  100% { opacity: 1; transform: translateX(0) translateY(0); }
+}
+.animate-toast-in { animation: toast-in 250ms var(--ease-expo-out) forwards; }
+
+/* ── Card Pulse Glow — speed scan with pauses ── */
+@keyframes pulse-scan {
+  0%    { background-position: -100% 0; }
+  16%   { background-position: 100% 0; }    /* scan right (fast) */
+  16.1% { background-position: 100% 0; }
+  50%   { background-position: 100% 0; }     /* pause ~1s */
+  66%   { background-position: -100% 0; }    /* scan left (fast) */
+  66.1% { background-position: -100% 0; }
+  100%  { background-position: -100% 0; }    /* pause ~1s */
+}
+
+.card-pulse-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-pulse-glow::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    oklch(0.58 0.08 230 / 0.015) 44%,
+    oklch(0.58 0.08 230 / 0.04) 48%,
+    oklch(0.58 0.08 230 / 0.06) 50%,
+    oklch(0.58 0.08 230 / 0.04) 52%,
+    oklch(0.58 0.08 230 / 0.015) 56%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation-name: pulse-scan;
+  animation-duration: var(--pulse-duration, 3s);
+  animation-delay: var(--pulse-delay, 0s);
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  border-radius: inherit;
+}
+
+.card-pulse-glow > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* ═══════════════════════════════════════════════════════
