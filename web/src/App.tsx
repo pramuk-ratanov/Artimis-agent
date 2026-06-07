@@ -18,7 +18,9 @@ import { TasksPanel } from "@/components/panels/tasks-panel"
 import { SkillsPanel } from "@/components/panels/skills-panel"
 import { ThemePanel } from "@/components/panels/theme-panel"
 import { StatisticsPanel } from "@/components/panels/statistics-panel"
+import { HarnessLabPanel } from "@/components/panels/harness-lab-panel"
 import { SettingsModal } from "@/components/panels/settings-modal"
+import { ToastProvider } from "@/components/ui/toast"
 
 function gen() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) {
@@ -48,6 +50,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [notificationCount, setNotificationCount] = useState(0)
   const [offline, setOffline] = useState(false)
+  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   const activeChat = chats.find(c => c.id === activeChatId) || chats[0]
@@ -106,17 +109,11 @@ function App() {
   }, [])
 
   const handleNewChat = useCallback((pid: string | null = null) => {
-    api.createSession().then(s => {
-      const c: FullChat = { id: s.id, name: s.name, projectId: pid, updatedAt: s.updated_at, messages: [] }
-      setChats(p => [c, ...p])
-      setActiveChatId(c.id)
-      setActiveTool(null)
-    }).catch(() => {
-      const c: FullChat = { id: gen(), name: "New Chat", projectId: pid, updatedAt: "", messages: [] }
-      setChats(p => [c, ...p])
-      setActiveChatId(c.id)
-      setActiveTool(null)
-    })
+    // Create local-only chat. Session is only persisted to DB on first message.
+    const c: FullChat = { id: gen(), name: "New Chat", projectId: pid, updatedAt: "", messages: [] }
+    setChats(p => [c, ...p])
+    setActiveChatId(c.id)
+    setActiveTool(null)
   }, [])
 
   const handleSelectChat = useCallback((id: string) => {
@@ -146,14 +143,13 @@ function App() {
   }, [])
 
   const handleArchiveChat = useCallback((id: string) => {
-    api.updateSessionName(id, chats.find(c => c.id === id)?.name || "Archived").catch(() => {})
-    fetch(`/api/sessions/${id}`, { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({status:"archived"}) }).catch(() => {})
+    api.updateSession(id, { status: "archived" }).catch(() => {})
     setChats(p => {
       const next = p.filter(c => c.id !== id)
       if (activeChatId === id && next.length > 0) setActiveChatId(next[0].id)
       return next
     })
-  }, [activeChatId, chats])
+  }, [activeChatId])
 
   const handleDeleteChat = useCallback((id: string) => {
     api.deleteSession(id).catch(() => {})
@@ -171,49 +167,90 @@ function App() {
       id: gen(), role: "user", content: text,
       timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     }
+
+    // Placeholder for streaming assistant response
+    const amId = gen()
+    const am: ChatMessage = {
+      id: amId, role: "assistant", content: "",
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+    }
+
     setChats(p => p.map(c => c.id === activeChatId ? {
-      ...c, messages: [...c.messages, um], updatedAt: new Date().toISOString(),
+      ...c, messages: [...c.messages, um, am], updatedAt: new Date().toISOString(),
     } : c))
 
     setIsLoading(true)
     setSignalState("thinking")
+    setStreamingMsgId(amId)
 
     try {
-      const res = await api.sendAgentMessage(text, activeChatId)
-      setSignalState("streaming")
-      const am: ChatMessage = {
-        id: gen(), role: "assistant", content: res.response,
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      }
-      setChats(p => p.map(c => c.id === activeChatId ? { ...c, messages: [...c.messages, am], updatedAt: new Date().toISOString() } : c))
-      setSignalState("idle")
+      const stream = await api.streamAgentMessage(text, activeChatId)
+      const reader = stream.getReader()
+      let responseText = ""
+      let sessionId = activeChatId
 
-      // Auto-name the session after the first exchange
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        if (value.type === "tool") {
+          setSignalState("thinking")
+        } else if (value.type === "start") {
+          setSignalState("streaming")
+          if (value.session_id) sessionId = value.session_id
+        } else if (value.type === "token") {
+          responseText += value.content || ""
+          setChats(p => p.map(c => c.id === activeChatId ? {
+            ...c,
+            messages: c.messages.map(m => m.id === amId ? { ...m, content: responseText } : m),
+          } : c))
+        } else if (value.type === "done") {
+          // Backend sends the authoritative session_id on the done event.
+          // (The start event does not carry it.) Capture it for ID sync below.
+          if (value.session_id) sessionId = value.session_id
+        } else if (value.type === "error") {
+          if (!responseText) responseText = value.content || "Something went wrong."
+          setChats(p => p.map(c => c.id === activeChatId ? {
+            ...c,
+            messages: c.messages.map(m => m.id === amId ? { ...m, content: responseText } : m),
+          } : c))
+          break
+        }
+      }
+
+      setSignalState("idle")
+      setStreamingMsgId(null)
+
+      // Sync frontend ID with backend session
+      if (sessionId && sessionId !== activeChatId) {
+        setActiveChatId(sessionId)
+        setChats(p => p.map(c => c.id === activeChatId ? { ...c, id: sessionId } : c))
+      }
+
+      // Auto-name the session after first exchange
+      const finalSessionId = sessionId || activeChatId
       const currentChat = chats.find(c => c.id === activeChatId)
       const isFirstExchange = currentChat && currentChat.messages.filter(m => m.role === "assistant").length === 0
       if (isFirstExchange || currentChat?.name === "New Chat") {
-        api.autoNameSession(activeChatId).then(r => {
+        api.autoNameSession(finalSessionId).then(r => {
           if (r.name && r.name !== "New Chat") {
-            setChats(p => p.map(c => c.id === activeChatId ? { ...c, name: r.name } : c))
+            setChats(p => p.map(c => (c.id === activeChatId || c.id === finalSessionId) ? { ...c, name: r.name } : c))
           }
         }).catch(() => {})
       }
+
     } catch {
       setSignalState("error")
-      const em: ChatMessage = {
-        id: gen(), role: "system", content: "Could not reach the Artimis backend on port 7001. Is it running?",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      }
-      setChats(p => p.map(c => c.id === activeChatId ? { ...c, messages: [...c.messages, em] } : c))
+      setStreamingMsgId(null)
+      setChats(p => p.map(c => c.id === activeChatId ? {
+        ...c,
+        messages: c.messages.map(m => m.id === amId ? { ...m, content: "Could not reach the Artimis backend. Is it running on port 7002?" } : m),
+      } : c))
       setTimeout(() => setSignalState("idle"), 3000)
     } finally {
       setIsLoading(false)
     }
   }, [activeChatId, chats])
-
-  const handleStreamingChange = useCallback((streaming: boolean) => {
-    if (!streaming && signalState === "streaming") setSignalState("idle")
-  }, [signalState])
 
   const handleRetry = useCallback(() => {
     const lastUserMsg = activeChat.messages.filter(m => m.role === "user").pop()
@@ -251,13 +288,14 @@ function App() {
       case "tasks": return <TasksPanel />
       case "skills": return <SkillsPanel />
       case "statistics": return <StatisticsPanel />
+      case "harness-lab": return <HarnessLabPanel />
       case "theme": return <ThemePanel />
       default: return null
     }
   }
 
   return (
-    <>
+    <ToastProvider>
       {showIntro && <IntroScreen onComplete={handleIntroDone} />}
 
       {!showIntro && (
@@ -303,7 +341,7 @@ function App() {
                 onRetry={handleRetry}
                 onOpenTool={handleSelectTool}
                 signalState={signalState}
-                onStreamingChange={handleStreamingChange}
+                streamingMsgId={streamingMsgId}
                 isLoading={isLoading}
               />
             )}
@@ -313,7 +351,7 @@ function App() {
 
       <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} actions={paletteActions} />
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
-    </>
+    </ToastProvider>
   )
 }
 

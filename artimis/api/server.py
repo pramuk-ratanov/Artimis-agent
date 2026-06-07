@@ -15,7 +15,7 @@ import os
 
 from artimis.db.schema import init_db
 from artimis.db import manager as db
-from artimis.db.schema import get_db
+from artimis.db.schema import get_db, now as db_now
 
 app = FastAPI(title="Artimis Agent", version="0.1.0")
 
@@ -136,6 +136,30 @@ async def rename_session(session_id: str, name: str):
     return s
 
 
+class UpdateSessionRequest(BaseModel):
+    name: Optional[str] = None
+    status: Optional[str] = None
+
+
+@app.put("/api/sessions/{session_id}")
+async def update_session(session_id: str, req: UpdateSessionRequest):
+    """Update session name and/or status. Used by archive/frontend actions."""
+    if req.name:
+        db.rename_session(session_id, req.name)
+    if req.status:
+        conn = get_db()
+        conn.execute(
+            "UPDATE sessions SET status = ?, updated_at = ? WHERE id = ?",
+            (req.status, db_now(), session_id)
+        )
+        conn.commit()
+        conn.close()
+    s = db.get_session(session_id)
+    if not s:
+        raise HTTPException(404, "Session not found")
+    return s
+
+
 @app.delete("/api/sessions/{session_id}")
 async def delete_session(session_id: str):
     db.delete_session(session_id)
@@ -241,6 +265,72 @@ async def agent_endpoint(req: AgentRequest):
         "tool_calls_made": result.get("tool_calls_made", 0),
         "model_used": result.get("model_used"),
     }
+
+
+@app.post("/api/agent/stream")
+async def agent_stream_endpoint(req: AgentRequest):
+    """
+    Streaming agent endpoint. Returns Server-Sent Events.
+    Tool-calling phase runs synchronously, then the final response streams as tokens.
+    """
+    from artimis.engine.agent import run_agent_streaming
+
+    session_id: str = req.session_id or ""
+    session = None
+
+    if session_id:
+        session = db.get_session(session_id)
+
+    if not session:
+        session = db.create_session()
+        session_id = session["id"]
+
+    db.add_message(session_id, "user", req.message)
+
+    messages = db.get_messages(session_id, limit=50)
+    history = []
+    for msg in messages:
+        if msg["role"] in ("user", "assistant"):
+            history.append({"role": msg["role"], "content": msg["content"]})
+
+    full_response = []
+
+    async def generate():
+        try:
+            for sse_chunk in run_agent_streaming(
+                user_message=req.message,
+                session_id=session_id,
+                conversation_history=history[:-1],
+                model=session.get("model"),
+            ):
+                # Accumulate full response from tokens
+                if "token" in sse_chunk:
+                    try:
+                        data = json.loads(sse_chunk.replace("data: ", ""))
+                        if data.get("type") == "token":
+                            full_response.append(data["content"])
+                    except json.JSONDecodeError:
+                        pass
+
+                yield sse_chunk
+
+            # Save the full assistant response
+            complete = "".join(full_response)
+            if complete:
+                db.add_message(session_id, "assistant", complete)
+
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/api/deep-research")
@@ -882,6 +972,307 @@ async def delete_agent(agent_id: str):
     db.execute("DELETE FROM custom_agents WHERE id=?", (agent_id,))
     db.commit()
     return {"deleted": True}
+
+
+# ─── Files ──────────────────────────────────────────────────
+
+_FILES_DIR = os.path.expanduser("~/.artimis/files")
+
+
+@app.post("/api/files/upload")
+async def upload_file(request: Request):
+    """Upload one or more files. Returns list of file records."""
+    os.makedirs(_FILES_DIR, exist_ok=True)
+
+    form = await request.form()
+    uploaded = []
+
+    for field_name in form:
+        field = form[field_name]
+        if not hasattr(field, "filename"):
+            continue
+
+        file_id = str(uuid4())
+        original_name = field.filename or "unknown"
+        ext = os.path.splitext(original_name)[1] or ""
+        storage_name = f"{file_id}{ext}"
+        storage_path = os.path.join(_FILES_DIR, storage_name)
+
+        content = await field.read()
+        with open(storage_path, "wb") as f:
+            f.write(content)
+
+        conn = get_db()
+        conn.execute(
+            "INSERT INTO files (id, filename, original_name, mime_type, size_bytes, storage_path) VALUES (?,?,?,?,?,?)",
+            (file_id, storage_name, original_name, field.content_type, len(content), storage_path)
+        )
+        conn.commit()
+        conn.close()
+
+        uploaded.append({
+            "id": file_id,
+            "original_name": original_name,
+            "mime_type": field.content_type,
+            "size_bytes": len(content),
+        })
+
+    return {"uploaded": uploaded, "count": len(uploaded)}
+
+
+@app.get("/api/files")
+async def list_files():
+    """List all uploaded files."""
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM files ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/files/{file_id}")
+async def get_file(file_id: str):
+    """Download/view a file. For text files, returns content. For binaries, returns raw."""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "File not found")
+
+    f = dict(row)
+    path = f["storage_path"]
+    if not os.path.exists(path):
+        raise HTTPException(404, "File missing from disk")
+
+    return FileResponse(path, filename=f["original_name"], media_type=f.get("mime_type"))
+
+
+@app.delete("/api/files/{file_id}")
+async def delete_file(file_id: str):
+    """Delete an uploaded file."""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+    if row:
+        path = dict(row)["storage_path"]
+        if os.path.exists(path):
+            os.remove(path)
+        conn.execute("DELETE FROM files WHERE id = ?", (file_id,))
+        conn.commit()
+    conn.close()
+    return {"deleted": True}
+
+
+# ─── Harness Self-Improvement ──────────────────────────────
+
+class CreateSnapshotRequest(BaseModel):
+    component: str  # 'system_prompt', 'tools', 'brain', 'skills', 'all'
+    source: str = "manual"
+
+class CreateExperimentRequest(BaseModel):
+    hypothesis: str
+    component: str
+    test_case_ids: Optional[list[str]] = None
+
+class CreateTestCaseRequest(BaseModel):
+    input_message: str
+    expected_traits: dict  # {must_contain: [...], must_not_contain: [...], min_critique_score: int}
+
+
+@app.post("/api/harness/snapshot")
+async def create_snapshot(req: CreateSnapshotRequest):
+    """Take a snapshot of current harness state."""
+    components = ["system_prompt", "tools", "brain", "skills"] if req.component == "all" else [req.component]
+    snapshots = []
+
+    conn = get_db()
+    latest = conn.execute("SELECT MAX(version) FROM harness_snapshots").fetchone()[0] or 0
+
+    for comp in components:
+        content = ""
+        if comp == "system_prompt":
+            from artimis.engine.system_prompt import SYSTEM_PROMPT
+            content = SYSTEM_PROMPT
+        elif comp == "tools":
+            import json as _json
+            from artimis.engine.tools import TOOL_SCHEMAS
+            content = _json.dumps(TOOL_SCHEMAS, indent=2)
+        elif comp == "brain":
+            from artimis.engine.brain import MAX_CONTEXT_CHARS
+            content = f"MAX_CONTEXT_CHARS={MAX_CONTEXT_CHARS}"
+        elif comp == "skills":
+            rows = conn.execute("SELECT name, version, content FROM skills ORDER BY name").fetchall()
+            content = "\n\n".join(f"# {r['name']} v{r['version']}\n{r['content']}" for r in rows)
+
+        latest += 1
+        sid = str(uuid4())
+        conn.execute(
+            "INSERT INTO harness_snapshots (id, version, component, content, source) VALUES (?,?,?,?,?)",
+            (sid, latest, comp, content, req.source)
+        )
+        snapshots.append({"id": sid, "version": latest, "component": comp})
+
+    conn.commit()
+    conn.close()
+    return {"snapshots": snapshots, "count": len(snapshots), "latest_version": latest}
+
+
+@app.get("/api/harness/versions")
+async def list_harness_versions(component: Optional[str] = None, limit: int = 20):
+    """List harness snapshots, optionally filtered by component."""
+    conn = get_db()
+    if component:
+        rows = conn.execute(
+            "SELECT * FROM harness_snapshots WHERE component = ? ORDER BY version DESC LIMIT ?",
+            (component, limit)
+        ).fetchall()
+    else:
+        rows = conn.execute(
+            "SELECT * FROM harness_snapshots ORDER BY version DESC LIMIT ?",
+            (limit,)
+        ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/harness/versions/{version}")
+async def get_harness_version(version: int):
+    """Get a specific harness version snapshot."""
+    conn = get_db()
+    row = conn.execute("SELECT * FROM harness_snapshots WHERE version = ?", (version,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(404, "Version not found")
+    return dict(row)
+
+
+@app.post("/api/harness/rollback")
+async def rollback_harness(version: int):
+    """Roll back to a previous harness version. Creates a new snapshot of current state first."""
+    conn = get_db()
+    target = conn.execute("SELECT * FROM harness_snapshots WHERE version = ?", (version,)).fetchone()
+    if not target:
+        conn.close()
+        raise HTTPException(404, "Target version not found")
+
+    t = dict(target)
+    comp = t["component"]
+
+    # Take a pre-rollback snapshot
+    latest = conn.execute("SELECT MAX(version) FROM harness_snapshots").fetchone()[0] or 0
+    current_content = ""
+    if comp == "system_prompt":
+        from artimis.engine.system_prompt import SYSTEM_PROMPT
+        current_content = SYSTEM_PROMPT
+    elif comp == "tools":
+        from artimis.engine.tools import TOOL_SCHEMAS
+        current_content = json.dumps(TOOL_SCHEMAS, indent=2)
+
+    pre_sid = str(uuid4())
+    conn.execute(
+        "INSERT INTO harness_snapshots (id, version, component, content, source) VALUES (?,?,?,?,?)",
+        (pre_sid, latest + 1, comp, current_content, "rollback")
+    )
+
+    # Apply rollback
+    # Note: Runtime rollback requires modifying in-memory state, which is limited.
+    # For system_prompt, we update the module variable.
+    # For tools/brain, changes require server restart.
+    applied = False
+    if comp == "system_prompt":
+        import artimis.engine.system_prompt as sp
+        sp.SYSTEM_PROMPT = t["content"]
+        applied = True
+
+    conn.commit()
+    conn.close()
+
+    return {
+        "rolled_back_to": version,
+        "component": comp,
+        "applied": applied,
+        "note": "System prompt updated in memory. Tool/brain changes require server restart."
+    }
+
+
+@app.post("/api/harness/experiment")
+async def run_experiment(req: CreateExperimentRequest):
+    """Run a harness experiment: snapshot → propose change → validate → apply/reject."""
+    conn = get_db()
+
+    # Get current version
+    current = conn.execute(
+        "SELECT MAX(version) FROM harness_snapshots WHERE component = ?", (req.component,)
+    ).fetchone()[0]
+
+    exp_id = str(uuid4())
+    conn.execute(
+        """INSERT INTO harness_experiments (id, hypothesis, component, before_version, test_case_ids, outcome)
+           VALUES (?,?,?,?,?,?)""",
+        (exp_id, req.hypothesis, req.component, current or 0, json.dumps(req.test_case_ids or []), "pending")
+    )
+    conn.commit()
+    conn.close()
+
+    return {"experiment_id": exp_id, "status": "pending", "before_version": current}
+
+
+@app.post("/api/harness/experiments/{exp_id}/apply")
+async def apply_experiment(exp_id: str, version: int, score_before: float = 0, score_after: float = 0):
+    """Mark an experiment as applied with its score delta."""
+    conn = get_db()
+    conn.execute(
+        """UPDATE harness_experiments
+           SET outcome = 'applied', after_version = ?, score_before = ?, score_after = ?, completed_at = ?
+           WHERE id = ?""",
+        (version, score_before, score_after, db_now(), exp_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"experiment_id": exp_id, "outcome": "applied"}
+
+
+@app.post("/api/harness/experiments/{exp_id}/reject")
+async def reject_experiment(exp_id: str, error: Optional[str] = None):
+    """Mark an experiment as rejected."""
+    conn = get_db()
+    conn.execute(
+        "UPDATE harness_experiments SET outcome = 'rejected', error_message = ?, completed_at = ? WHERE id = ?",
+        (error, db_now(), exp_id)
+    )
+    conn.commit()
+    conn.close()
+    return {"experiment_id": exp_id, "outcome": "rejected"}
+
+
+@app.get("/api/harness/experiments")
+async def list_experiments(limit: int = 20):
+    """List harness experiments."""
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM harness_experiments ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/harness/test-cases")
+async def create_test_case(req: CreateTestCaseRequest):
+    """Create a test case for harness validation."""
+    conn = get_db()
+    tc_id = str(uuid4())
+    conn.execute(
+        "INSERT INTO test_cases (id, input_message, expected_traits) VALUES (?,?,?)",
+        (tc_id, req.input_message, json.dumps(req.expected_traits))
+    )
+    conn.commit()
+    conn.close()
+    return {"id": tc_id, "input_message": req.input_message}
+
+
+@app.get("/api/harness/test-cases")
+async def list_test_cases():
+    """List all test cases."""
+    conn = get_db()
+    rows = conn.execute("SELECT * FROM test_cases ORDER BY created_at DESC").fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
 
 
 # ─── Health ───────────────────────────────────────────────

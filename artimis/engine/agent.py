@@ -357,6 +357,30 @@ Be proactive, not pushy. One insight per response maximum. If nothing relevant c
         except Exception:
             pass
 
+        # Auto-experiment trigger: if critique score stayed below threshold,
+        # create a harness improvement experiment
+        if best_score < 6 and session_id:
+            try:
+                from artimis.db.schema import get_db, generate_id, now
+                conn = get_db()
+                # Check how many recent experiments are pending
+                pending = conn.execute(
+                    "SELECT COUNT(*) FROM harness_experiments WHERE outcome = 'pending'"
+                ).fetchone()[0]
+                # Only create if no pending experiments (prevent flood)
+                if pending == 0:
+                    exp_id = generate_id()
+                    conn.execute(
+                        """INSERT INTO harness_experiments (id, hypothesis, component, before_version, outcome)
+                           VALUES (?,?,?, (SELECT COALESCE(MAX(version),0) FROM harness_snapshots WHERE component='system_prompt'), 'pending')""",
+                        (exp_id, f"Auto-triggered: critique score {best_score}/10. Hypothesis: system_prompt needs refinement for this type of query.", "system_prompt")
+                    )
+                    conn.commit()
+                    intelligence_notes.append(f"[harness] auto-created experiment {exp_id[:8]} (score {best_score}/10)")
+                conn.close()
+            except Exception:
+                pass
+
         return {
             "response": best_response,
             "tool_calls_made": tool_calls_made,
@@ -374,3 +398,181 @@ Be proactive, not pushy. One insight per response maximum. If nothing relevant c
         "iterations": max_iterations,
         "model_used": model_name,
     }
+
+
+def run_agent_streaming(
+    user_message: str,
+    session_id: Optional[str] = None,
+    model: Optional[str] = None,
+    conversation_history: Optional[list] = None,
+    max_iterations: int = 10,
+):
+    """
+    Streaming version of run_agent. Yields SSE chunks for the final response.
+    Tool-calling phase runs synchronously, final response streams via SSE.
+
+    The terminal ``done`` event carries ``session_id`` and ``tool_calls_made`` so
+    the frontend can sync the session ID (preventing duplicate-session leaks) and
+    fire auto-naming. After streaming completes, the accumulated response is run
+    through the intelligence layer (critique + auto-experiment trigger) so the
+    streaming path stays in parity with the synchronous ``run_agent`` path.
+    """
+    model_name = model or DEFAULT_MODEL
+    client = _get_client(model_name)
+
+    # Build messages exactly like run_agent
+    messages = []
+    system_content = SYSTEM_PROMPT
+
+    if session_id:
+        try:
+            from artimis.engine.brain import process_user_message
+            brain_context = process_user_message(session_id, user_message)
+            if brain_context:
+                system_content += brain_context
+        except Exception:
+            pass
+
+    system_content += """
+## SELF-PROMPTING BEHAVIOR
+You are NOT a passive assistant. At the end of every response, ask yourself:
+- Is there a pattern across previous sessions I should flag?
+- Is there a skill or memory relevant to this that I haven't mentioned?
+If yes, add a brief note. Be proactive, not pushy. One insight per response maximum."""
+
+    messages.append({"role": "system", "content": system_content})
+    if conversation_history:
+        messages.extend(conversation_history)
+    messages.append({"role": "user", "content": user_message})
+
+    tool_calls_made = 0
+
+    # Phase 1: Tool calling loop (synchronous)
+    for iteration in range(max_iterations):
+        try:
+            response = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                tools=TOOL_SCHEMAS,
+                tool_choice="auto",
+                temperature=0.7,
+            )
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            return
+
+        choice = response.choices[0]
+        msg = choice.message
+
+        if msg.tool_calls:
+            assistant_msg = {
+                "role": "assistant",
+                "content": msg.content,
+                "tool_calls": [
+                    {"id": tc.id, "type": "function", "function": {"name": tc.function.name, "arguments": tc.function.arguments}}
+                    for tc in msg.tool_calls
+                ],
+            }
+            messages.append(assistant_msg)
+
+            for tc in msg.tool_calls:
+                tool_name = tc.function.name
+                try:
+                    tool_args = json.loads(tc.function.arguments)
+                except json.JSONDecodeError:
+                    tool_args = {}
+
+                # Yield tool call status
+                yield f"data: {json.dumps({'type': 'tool', 'name': tool_name})}\n\n"
+
+                result = execute_tool(tool_name, tool_args)
+                tool_calls_made += 1
+
+                messages.append({"role": "tool", "tool_call_id": tc.id, "content": result})
+            continue
+
+        # Phase 2: Stream the final response
+        yield f"data: {json.dumps({'type': 'start', 'tool_calls_made': tool_calls_made, 'model': model_name})}\n\n"
+
+        streamed_parts = []
+        try:
+            stream = client.chat.completions.create(
+                model=model_name,
+                messages=messages,
+                temperature=0.7,
+                max_tokens=2000,
+                stream=True,
+            )
+
+            for chunk in stream:
+                if chunk.choices and chunk.choices[0].delta.content:
+                    content = chunk.choices[0].delta.content
+                    streamed_parts.append(content)
+                    yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+
+        except Exception as e:
+            logger.error(f"Streaming failed: {e}")
+            # Fallback: non-streaming call
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=2000,
+                )
+                fallback = response.choices[0].message.content or ""
+                streamed_parts.append(fallback)
+                yield f"data: {json.dumps({'type': 'token', 'content': fallback})}\n\n"
+            except Exception as e2:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e2)})}\n\n"
+                return
+
+        final_text = "".join(streamed_parts)
+
+        # ═══ INTELLIGENCE LAYER (parity with run_agent) ═══
+        # Run critique + auto-experiment trigger on the streamed response so the
+        # meta-harness self-improvement loop fires on the default (streaming) path.
+        critique_score = None
+        try:
+            from artimis.engine.intelligence import self_critique, learn_from_critique
+            critique = self_critique(user_message, final_text, tool_calls_made)
+            critique_score = critique.get("overall_score", 7)
+            try:
+                learn_from_critique(critique, user_message, session_id)
+            except Exception:
+                pass
+        except Exception:
+            pass
+
+        # Auto-experiment trigger: low critique score → create harness experiment
+        if critique_score is not None and critique_score < 6 and session_id:
+            try:
+                from artimis.db.schema import get_db, generate_id
+                conn = get_db()
+                pending = conn.execute(
+                    "SELECT COUNT(*) FROM harness_experiments WHERE outcome = 'pending'"
+                ).fetchone()[0]
+                if pending == 0:
+                    exp_id = generate_id()
+                    conn.execute(
+                        """INSERT INTO harness_experiments (id, hypothesis, component, before_version, outcome)
+                           VALUES (?,?,?, (SELECT COALESCE(MAX(version),0) FROM harness_snapshots WHERE component='system_prompt'), 'pending')""",
+                        (exp_id, f"Auto-triggered (streaming): critique score {critique_score}/10. Hypothesis: system_prompt needs refinement for this type of query.", "system_prompt")
+                    )
+                    conn.commit()
+                conn.close()
+            except Exception:
+                pass
+
+        done_payload = {
+            "type": "done",
+            "session_id": session_id,
+            "tool_calls_made": tool_calls_made,
+            "model": model_name,
+        }
+        if critique_score is not None:
+            done_payload["critique_score"] = critique_score
+        yield f"data: {json.dumps(done_payload)}\n\n"
+        return
+
+    yield f"data: {json.dumps({'type': 'error', 'content': 'Max iterations reached'})}\n\n"
