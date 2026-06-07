@@ -118,7 +118,7 @@ function MemoryCard({
         {m.tags.length > 0 && m.tags.map(t => (
           <span
             key={t}
-            className="text-caption text-ink-muted bg-surface-2 border border-surface-3 px-1.5 py-0.5 rounded-control font-share"
+            className="tag-pill tag-pill-blue"
           >
             {t}
           </span>

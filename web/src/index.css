@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════
    ARTIMIS — Design Tokens & Base Styles
-   All tokens live here. No separate token file. Tailwind v4 CSS config.
+   Protocol: Premium Utilitarian Minimalism (taste-skill/minimalist-skill)
+   Dark mode adaptation. No shadows, warm off-black surfaces, restrained accents.
    ═══════════════════════════════════════════════════════════════ */
 
 @import "tailwindcss";
@@ -9,41 +10,51 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ═══════════════════════════════════════════════════════
-   Design Tokens
+   Design Tokens — Minimalist Dark
    ═══════════════════════════════════════════════════════ */
 
 @theme {
-  /* ── Signal (the single accent — muted blue, hue 240) ── */
-  --color-signal-200: oklch(0.85 0.05 240);
-  --color-signal-300: oklch(0.75 0.08 240);
-  --color-signal-400: oklch(0.65 0.10 240);
-  --color-signal-500: oklch(0.55 0.12 240);
-  --color-signal-600: oklch(0.45 0.10 240);
-  --color-signal-700: oklch(0.35 0.08 240);
+  /* ── Signal (single accent — pale blue, restrained chroma) ── */
+  --color-signal-200: oklch(0.82 0.04 230);
+  --color-signal-300: oklch(0.70 0.06 230);
+  --color-signal-400: oklch(0.58 0.08 230);
+  --color-signal-500: oklch(0.48 0.10 230);
+  --color-signal-600: oklch(0.38 0.08 230);
+  --color-signal-700: oklch(0.28 0.06 230);
 
-  /* ── Surfaces (near-black → elevated greys, hue 240, chroma 0.005) ── */
-  --color-surface-0: oklch(0.06 0.005 240);
-  --color-surface-1: oklch(0.10 0.005 240);
-  --color-surface-2: oklch(0.14 0.005 240);
-  --color-surface-3: oklch(0.18 0.005 240);
-  --color-surface-4: oklch(0.22 0.005 240);
-  --color-surface-5: oklch(0.26 0.005 240);
+  /* ── Surfaces (warm off-blacks → elevated, hue shifted to 30 for warmth) ── */
+  --color-surface-0: oklch(0.08 0.003 30);
+  --color-surface-1: oklch(0.12 0.003 30);
+  --color-surface-2: oklch(0.16 0.003 30);
+  --color-surface-3: oklch(0.20 0.003 30);
+  --color-surface-4: oklch(0.24 0.003 30);
+  --color-surface-5: oklch(0.28 0.003 30);
 
-  /* ── Ink (neutral text, zero chroma) ── */
-  --color-ink-primary: oklch(0.95 0 0);
-  --color-ink-secondary: oklch(0.70 0 0);
-  --color-ink-muted: oklch(0.45 0 0);
-  --color-ink-faint: oklch(0.25 0 0);
+  /* ── Ink (warm off-white text, never pure white) ── */
+  --color-ink-primary: oklch(0.93 0.002 60);
+  --color-ink-secondary: oklch(0.68 0.002 60);
+  --color-ink-muted: oklch(0.44 0.002 60);
+  --color-ink-faint: oklch(0.26 0.002 60);
 
   /* ── Status ── */
-  --color-ok: oklch(0.65 0.15 145);
-  --color-warn: oklch(0.70 0.15 75);
-  --color-error: oklch(0.55 0.18 25);
+  --color-ok: oklch(0.62 0.12 145);
+  --color-warn: oklch(0.68 0.12 75);
+  --color-error: oklch(0.52 0.14 20);
 
-  /* ── Fonts ── */
+  /* ── Muted pastel accents (tags, badges, inline code) ── */
+  --color-accent-red-bg: oklch(0.28 0.04 20);
+  --color-accent-red-text: oklch(0.65 0.08 20);
+  --color-accent-blue-bg: oklch(0.25 0.04 230);
+  --color-accent-blue-text: oklch(0.60 0.08 230);
+  --color-accent-green-bg: oklch(0.24 0.04 140);
+  --color-accent-green-text: oklch(0.58 0.08 140);
+  --color-accent-yellow-bg: oklch(0.26 0.04 90);
+  --color-accent-yellow-text: oklch(0.62 0.08 90);
+
+  /* ── Fonts (sans-serif body, mono for UI, mono for code) ── */
   --font-share: "Share Tech Mono", monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
 
   /* ── Type scale ── */
   --font-size-display: 1.3125rem;
@@ -53,28 +64,28 @@
   --font-size-caption: 0.625rem;
   --font-size-code: 0.71875rem;
 
-  /* ── Radii ── */
-  --radius-control: 4px;
-  --radius-card: 5px;
-  --radius-composer: 6px;
+  /* ── Radii (tight, flat — no rounded-full for containers) ── */
+  --radius-control: 5px;
+  --radius-card: 8px;
+  --radius-composer: 8px;
 
   /* ── Easing ── */
   --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 /* ═══════════════════════════════════════════════════════
-   Tailwind shadcn compat (inline theme)
+   Tailwind shadcn compat
    ═══════════════════════════════════════════════════════ */
 
 @theme inline {
   --font-heading: var(--font-sans);
   --color-background: var(--color-surface-0);
   --color-foreground: var(--color-ink-primary);
-  --color-card: var(--color-surface-2);
+  --color-card: var(--color-surface-1);
   --color-card-foreground: var(--color-ink-primary);
   --color-popover: var(--color-surface-2);
   --color-popover-foreground: var(--color-ink-primary);
-  --color-primary: var(--color-signal-600);
+  --color-primary: var(--color-surface-2);
   --color-primary-foreground: var(--color-ink-primary);
   --color-secondary: var(--color-surface-1);
   --color-secondary-foreground: var(--color-ink-secondary);
@@ -85,15 +96,15 @@
   --color-destructive: var(--color-error);
   --color-border: var(--color-surface-3);
   --color-input: var(--color-surface-1);
-  --color-ring: oklch(0.55 0.12 240 / 0.35);
+  --color-ring: oklch(0.48 0.10 230 / 0.25);
   --color-sidebar: var(--color-surface-1);
   --color-sidebar-foreground: var(--color-ink-secondary);
-  --color-sidebar-primary: var(--color-signal-600);
+  --color-sidebar-primary: var(--color-surface-2);
   --color-sidebar-primary-foreground: var(--color-ink-primary);
   --color-sidebar-accent: var(--color-surface-2);
   --color-sidebar-accent-foreground: var(--color-ink-primary);
   --color-sidebar-border: var(--color-surface-3);
-  --color-sidebar-ring: oklch(0.55 0.12 240 / 0.2);
+  --color-sidebar-ring: oklch(0.48 0.10 230 / 0.15);
   --radius: var(--radius-control);
   --radius-sm: 4px;
   --radius-md: var(--radius-card);
@@ -102,13 +113,6 @@
 
 /* ═══════════════════════════════════════════════════════
    Reset
-
-   NOTE: Do NOT add an unlayered universal margin/padding reset here.
-   In Tailwind v4 every utility lives inside the utilities layer, and
-   unlayered rules ALWAYS beat layered ones in the cascade. An unlayered
-   universal padding:0 therefore silently overrides EVERY px/p utility in
-   the app (zero padding everywhere). Tailwind preflight already resets
-   margin/padding inside its layers, so we only set box-sizing.
    ═══════════════════════════════════════════════════════ */
 
 *, *::before, *::after {
@@ -122,11 +126,11 @@ html, body, #root {
 }
 
 body {
-  font-family: var(--font-share);
+  font-family: var(--font-sans);
   font-weight: 400;
   font-size: var(--font-size-body);
-  line-height: 1.65;
-  letter-spacing: 0.01em;
+  line-height: 1.6;
+  letter-spacing: 0;
   color: var(--color-ink-primary);
   background: var(--color-surface-0);
   -webkit-font-smoothing: antialiased;
@@ -135,45 +139,45 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════
-   Scrollbar
+   Scrollbar — ultra-thin, minimal
    ═══════════════════════════════════════════════════════ */
 
-::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--color-surface-5); }
-::-webkit-scrollbar-thumb:hover { background: var(--color-signal-700); }
+::-webkit-scrollbar-thumb { background: var(--color-surface-4); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-surface-5); }
 
 /* ═══════════════════════════════════════════════════════
    Selection
    ═══════════════════════════════════════════════════════ */
 
 ::selection {
-  background: oklch(0.55 0.12 240 / 0.25);
+  background: oklch(0.48 0.10 230 / 0.20);
   color: var(--color-ink-primary);
 }
 
 /* ═══════════════════════════════════════════════════════
-   Focus
+   Focus — clean ring, no offset
    ═══════════════════════════════════════════════════════ */
 
 :focus { outline: none; }
 :focus-visible {
-  outline: 2px solid var(--color-signal-500);
-  outline-offset: 2px;
+  outline: 1.5px solid var(--color-signal-400);
+  outline-offset: 1px;
 }
 
 /* ═══════════════════════════════════════════════════════
-   Keyframes
+   Keyframes — subtle, minimal motion
    ═══════════════════════════════════════════════════════ */
 
 @keyframes signal-breath {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.85; }
 }
 
 @keyframes signal-pulse {
-  0%, 100% { opacity: 0.95; transform: scale(0.95); }
-  50% { opacity: 1; transform: scale(1.1); }
+  0%, 100% { opacity: 0.90; transform: scale(0.97); }
+  50% { opacity: 1; transform: scale(1.05); }
 }
 
 @keyframes caret-blink {
@@ -182,24 +186,21 @@ body {
 }
 
 @keyframes fade-up {
-  0% { opacity: 0; transform: translateY(6px); }
+  0% { opacity: 0; transform: translateY(4px); }
   100% { opacity: 1; transform: translateY(0); }
 }
 
-.animate-signal-breath { animation: signal-breath 4s ease-in-out infinite; }
-.animate-signal-pulse  { animation: signal-pulse 1.2s ease-in-out infinite; }
+.animate-signal-breath { animation: signal-breath 5s ease-in-out infinite; }
+.animate-signal-pulse  { animation: signal-pulse 1.5s ease-in-out infinite; }
 .caret-blink { animation: caret-blink 1s step-end infinite; }
-.animate-fade-up { animation: fade-up 300ms var(--ease-expo-out) forwards; }
-.animate-fade-up-delay-1 { animation-delay: 60ms; }
-.animate-fade-up-delay-2 { animation-delay: 120ms; }
+.animate-fade-up { animation: fade-up 250ms var(--ease-expo-out) forwards; }
+.animate-fade-up-delay-1 { animation-delay: 50ms; }
+.animate-fade-up-delay-2 { animation-delay: 100ms; }
 
 /* ═══════════════════════════════════════════════════════
    Utility classes
    ═══════════════════════════════════════════════════════ */
 
-/* Main heading — inherits body font */
-
-/* Type scale utilities */
 .text-display  { font-size: var(--font-size-display); }
 .text-heading  { font-size: var(--font-size-heading); }
 .text-body     { font-size: var(--font-size-body); }
@@ -207,51 +208,49 @@ body {
 .text-caption  { font-size: var(--font-size-caption); }
 .text-code     { font-size: var(--font-size-code); }
 
-/* Radius utilities */
 .rounded-control  { border-radius: var(--radius-control); }
 .rounded-card     { border-radius: var(--radius-card); }
 .rounded-composer { border-radius: var(--radius-composer); }
 
-/* Easing utility */
 .ease-expo-out { transition-timing-function: var(--ease-expo-out); }
 
 /* ═══════════════════════════════════════════════════════
-   Sidebar item — selected/unselected pattern
+   Sidebar
    ═══════════════════════════════════════════════════════ */
 
 .sidebar-item {
-  transition: background 150ms var(--ease-expo-out),
-              color 150ms var(--ease-expo-out),
-              border-color 150ms var(--ease-expo-out);
+  transition: background 120ms var(--ease-expo-out),
+              color 120ms var(--ease-expo-out);
 }
 
 /* ═══════════════════════════════════════════════════════
-   Chat messages
+   Chat messages — editorial, clean rhythm
    ═══════════════════════════════════════════════════════ */
 
 .msg-turn {
-  max-width: 72ch;
+  max-width: 68ch;
   padding: 0;
 }
 
 .msg-turn p {
   margin: 0;
-  padding: 4px 0;
+  padding: 3px 0;
 }
 
-/* Markdown rendered content */
 .msg-content h1, .msg-content h2, .msg-content h3 {
   font-weight: 600;
-  margin-top: 1em;
-  margin-bottom: 0.35em;
+  margin-top: 1.2em;
+  margin-bottom: 0.3em;
   color: var(--color-ink-primary);
+  font-family: var(--font-sans);
+  letter-spacing: -0.01em;
 }
 
-.msg-content h1 { font-size: 1.25rem; }
-.msg-content h2 { font-size: 1.1rem; }
-.msg-content h3 { font-size: 1rem; }
+.msg-content h1 { font-size: 1.2rem; }
+.msg-content h2 { font-size: 1.05rem; }
+.msg-content h3 { font-size: 0.95rem; }
 
-.msg-content p { margin-bottom: 0.5em; }
+.msg-content p { margin-bottom: 0.45em; font-family: var(--font-sans); }
 .msg-content p:last-child { margin-bottom: 0; }
 
 .msg-content code {
@@ -268,9 +267,9 @@ body {
   background: var(--color-surface-1);
   border: 1px solid var(--color-surface-3);
   border-radius: var(--radius-card);
-  padding: 12px 14px;
+  padding: 14px 16px;
   overflow-x: auto;
-  margin: 0.5em 0;
+  margin: 0.6em 0;
 }
 
 .msg-content pre code {
@@ -278,18 +277,21 @@ body {
   border: none;
   padding: 0;
   color: var(--color-ink-secondary);
+  font-family: var(--font-mono);
 }
 
 .msg-content ul, .msg-content ol { padding-left: 1.3em; margin-bottom: 0.5em; }
-.msg-content li { margin-bottom: 0.15em; }
-.msg-content strong { font-weight: 700; color: var(--color-ink-primary); }
+.msg-content li { margin-bottom: 0.12em; font-family: var(--font-sans); }
+.msg-content strong { font-weight: 600; color: var(--color-ink-primary); }
+.msg-content em { font-style: italic; }
 
 .msg-content blockquote {
   border-left: 2px solid var(--color-surface-3);
-  padding-left: 10px;
-  margin: 0.5em 0;
+  padding-left: 12px;
+  margin: 0.6em 0;
   color: var(--color-ink-secondary);
   font-style: italic;
+  font-family: var(--font-sans);
 }
 
 .msg-content hr {
@@ -302,12 +304,13 @@ body {
   width: 100%;
   border-collapse: collapse;
   margin: 0.7em 0;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
+  font-family: var(--font-sans);
 }
 
 .msg-content th {
   text-align: left;
-  padding: 5px 10px;
+  padding: 6px 12px;
   background: var(--color-surface-2);
   border-bottom: 1px solid var(--color-surface-3);
   font-weight: 600;
@@ -315,29 +318,27 @@ body {
 }
 
 .msg-content td {
-  padding: 4px 10px;
-  border-bottom: 1px solid oklch(0.14 0.005 240);
+  padding: 5px 12px;
+  border-bottom: 1px solid var(--color-surface-3);
   color: var(--color-ink-primary);
 }
 
 /* ═══════════════════════════════════════════════════════
-   Dark Horizon Glow Background
+   Dark Horizon Glow — subtler, lower contrast
    ═══════════════════════════════════════════════════════ */
 
 .dark-horizon-glow {
-  background: radial-gradient(125% 125% at 50% 90%, #000000 40%, #0d1a36 100%);
+  background: radial-gradient(120% 120% at 50% 85%, oklch(0.06 0.003 30) 30%, oklch(0.10 0.02 240) 100%);
 }
 
 /* ═══════════════════════════════════════════════════════
-   SpotlightButton — cursor-following glow on CTAs
-   Uses CSS custom props (--x, --y) set by JS on pointermove.
-   No re-renders; the ::before pseudo-element does all the work.
+   SpotlightButton — cursor-following glow (flat, no shadow)
    ═══════════════════════════════════════════════════════ */
 
 .spotlight-button-wrap {
   position: relative;
   display: inline-flex;
-  isolation: isolate;          /* own stacking context — glow stays local */
+  isolation: isolate;
 }
 
 .spotlight-button-wrap::before {
@@ -347,11 +348,11 @@ body {
   pointer-events: none;
   border-radius: inherit;
   opacity: 0;
-  transition: opacity 200ms ease;
+  transition: opacity 180ms ease;
   background: radial-gradient(
-    80px circle at var(--x, 50%) var(--y, 50%),
-    oklch(0.65 0.1 240 / 0.22) 0%,
-    oklch(0.65 0.1 240 / 0.08) 40%,
+    60px circle at var(--x, 50%) var(--y, 50%),
+    oklch(0.58 0.08 230 / 0.18) 0%,
+    oklch(0.58 0.08 230 / 0.05) 45%,
     transparent 70%
   );
   z-index: 1;
@@ -361,23 +362,39 @@ body {
   opacity: 1;
 }
 
-/* Children sit above the glow layer */
 .spotlight-button-wrap > * {
   position: relative;
   z-index: 2;
 }
 
 /* ═══════════════════════════════════════════════════════
+   Tag pill — muted pastel backgrounds
+   ═══════════════════════════════════════════════════════ */
+
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 1px 10px;
+  font-size: var(--font-size-caption);
+  font-weight: 500;
+  font-family: var(--font-sans);
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.tag-pill-blue  { background: var(--color-accent-blue-bg);  color: var(--color-accent-blue-text);  border-color: oklch(0.35 0.02 230 / 0.5); }
+.tag-pill-red   { background: var(--color-accent-red-bg);   color: var(--color-accent-red-text);   border-color: oklch(0.35 0.02 20 / 0.5); }
+.tag-pill-green { background: var(--color-accent-green-bg); color: var(--color-accent-green-text); border-color: oklch(0.30 0.02 140 / 0.5); }
+.tag-pill-yellow{ background: var(--color-accent-yellow-bg);color: var(--color-accent-yellow-text);border-color: oklch(0.35 0.02 90 / 0.5); }
+
+/* ═══════════════════════════════════════════════════════
    Reduced motion
    ═══════════════════════════════════════════════════════ */
 
 @media (prefers-reduced-motion: reduce) {
-  .spotlight-button-wrap::before {
-    transition: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
+  .spotlight-button-wrap::before { transition: none; }
   .animate-signal-breath,
   .animate-signal-pulse { animation: none; }
   .animate-fade-up { animation: none; opacity: 1; transform: none; }

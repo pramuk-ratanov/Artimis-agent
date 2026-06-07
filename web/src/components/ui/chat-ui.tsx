@@ -294,8 +294,8 @@ export function ChatUI({
       <div className="shrink-0 px-8 pb-6 pt-2">
         <div className="max-w-[72ch] mx-auto">
           <div className="flex items-stretch bg-surface-1 border border-surface-3 rounded-composer
-            overflow-hidden focus-within:border-signal-500 focus-within:shadow-[0_0_0_1px_rgba(14,165,233,0.35)]
-            transition-all duration-150 ease-expo-out">
+            overflow-hidden focus-within:border-signal-400
+            transition-colors duration-150 ease-expo-out">
             <span className="flex items-center pl-3 pr-1.5 text-body font-mono text-signal-400 select-none">
               &gt;
             </span>
@@ -316,10 +316,10 @@ export function ChatUI({
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className={`px-5 text-label font-semibold font-share transition-all duration-150 ease-expo-out
+                className={`px-5 text-label font-medium font-sans transition-all duration-120 ease-expo-out
                   active:scale-[0.97]
                   ${input.trim()
-                    ? "bg-signal-600 text-ink-primary"
+                    ? "bg-surface-2 text-ink-primary hover:bg-surface-3"
                     : "bg-transparent text-ink-muted"}`}
               >
                 Send

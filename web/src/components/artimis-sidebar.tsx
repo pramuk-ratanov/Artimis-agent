@@ -210,8 +210,8 @@ export function ArtimisSidebar({
           <button
             onClick={() => onNewChat(null)}
             className="w-full flex items-center gap-2 h-9 px-3 rounded-control bg-surface-2 text-label
-              font-medium text-ink-secondary hover:border-signal-500 hover:text-ink-primary
-              border border-transparent transition-all duration-150 ease-expo-out font-share"
+              font-medium text-ink-secondary hover:text-ink-primary hover:bg-surface-3
+              border border-transparent transition-all duration-120 ease-expo-out font-sans active:scale-[0.98]"
           >
             <Plus size={14} weight="regular" />
             <span>New Chat</span>

@@ -122,7 +122,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     >
       <div
         className="bg-surface-1 border border-surface-3 rounded-card w-[500px] max-w-[92vw] max-h-[88vh]
-          overflow-hidden shadow-xl font-share flex flex-col"
+          overflow-hidden font-share flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -236,18 +236,17 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-1.5 bg-surface-2 border border-surface-3 text-label font-semibold
-                text-ink-secondary font-share rounded-control transition-all duration-150 ease-expo-out
-                hover:border-surface-4 active:scale-[0.97]"
+              className="px-4 py-1.5 text-label font-medium text-ink-muted font-sans
+                rounded-control transition-colors duration-120 hover:text-ink-secondary"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-4 py-1.5 bg-signal-600 text-label font-semibold text-ink-primary font-share
-                rounded-control transition-all duration-150 ease-expo-out
-                hover:bg-signal-500 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-1.5 bg-surface-2 text-label font-medium text-ink-primary font-sans
+                rounded-control transition-all duration-120 ease-expo-out
+                hover:bg-surface-3 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               {saving ? "Saving…" : "Save"}
             </button>
