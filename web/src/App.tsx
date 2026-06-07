@@ -116,6 +116,23 @@ function App() {
   const handleSelectChat = useCallback((id: string) => {
     setActiveChatId(id)
     setActiveTool(null)
+    // Load messages from backend if not already loaded
+    setChats(p => {
+      const chat = p.find(c => c.id === id)
+      if (chat && chat.messages.length === 0) {
+        api.getSessionMessages(id, 100, 0).then(msgs => {
+          const mapped: ChatMessage[] = msgs.map(m => ({
+            id: String(m.id),
+            role: m.role as ChatMessage["role"],
+            content: m.content,
+            timestamp: new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            tool_calls: m.tool_calls,
+          }))
+          setChats(prev => prev.map(c => c.id === id ? { ...c, messages: mapped } : c))
+        }).catch(() => {})
+      }
+      return p
+    })
   }, [])
 
   const handleCreateProject = useCallback((n: string) => {
@@ -131,7 +148,6 @@ function App() {
     }
     setChats(p => p.map(c => c.id === activeChatId ? {
       ...c, messages: [...c.messages, um], updatedAt: new Date().toISOString(),
-      name: c.name === "New Chat" ? text.slice(0, 40) + (text.length > 40 ? "..." : "") : c.name,
     } : c))
 
     setIsLoading(true)
@@ -146,6 +162,17 @@ function App() {
       }
       setChats(p => p.map(c => c.id === activeChatId ? { ...c, messages: [...c.messages, am], updatedAt: new Date().toISOString() } : c))
       setSignalState("idle")
+
+      // Auto-name the session after the first exchange
+      const currentChat = chats.find(c => c.id === activeChatId)
+      const isFirstExchange = currentChat && currentChat.messages.filter(m => m.role === "assistant").length === 0
+      if (isFirstExchange || currentChat?.name === "New Chat") {
+        api.autoNameSession(activeChatId).then(r => {
+          if (r.name && r.name !== "New Chat") {
+            setChats(p => p.map(c => c.id === activeChatId ? { ...c, name: r.name } : c))
+          }
+        }).catch(() => {})
+      }
     } catch {
       setSignalState("error")
       const em: ChatMessage = {
@@ -157,7 +184,7 @@ function App() {
     } finally {
       setIsLoading(false)
     }
-  }, [activeChatId])
+  }, [activeChatId, chats])
 
   const handleStreamingChange = useCallback((streaming: boolean) => {
     if (!streaming && signalState === "streaming") setSignalState("idle")
