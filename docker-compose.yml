@@ -1,0 +1,30 @@
+# Artimis Agent — one-command run
+#
+#   docker compose up -d        # build + start in background
+#   docker compose logs -f      # follow logs
+#   docker compose down         # stop
+#
+# Config & data persist in the ./artimis-data host folder (mapped to /data).
+# Put your API key in ./artimis-data/.env before first run, e.g.:
+#   DEEPSEEK_API_KEY=sk-...
+#   ARTIMIS_MODEL=deepseek-v4-pro
+# (or OPENAI_API_KEY / OPENROUTER_API_KEY)
+
+services:
+  artimis:
+    build: .
+    image: artimis:latest
+    container_name: artimis
+    ports:
+      - "7002:7002"
+    volumes:
+      - ./artimis-data:/data
+    environment:
+      - ARTIMIS_HOME=/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:7002/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

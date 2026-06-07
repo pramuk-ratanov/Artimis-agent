@@ -118,18 +118,50 @@ def get_relevant_memories(query: str, max_results: int = 15) -> list[dict]:
 
 
 def format_memories_for_prompt(memories: list[dict]) -> str:
-    """Format memories for injection into the system prompt."""
+    """Format memories for injection into the system prompt with tier labels."""
     if not memories:
         return ""
 
-    lines = ["\n## ACTIVE MEMORIES (red-highlighted in Brain)"]
-    for m in memories:
-        prefix = "[PINNED] " if m.get("pinned") else ""
-        tags = json.loads(m.get("tags", "[]"))
-        tag_str = f" [{', '.join(tags)}]" if tags else ""
-        lines.append(f"- {prefix}{m['content']}{tag_str}")
+    # Split into tiers
+    pinned = [m for m in memories if m.get("pinned")]
+    identity = [m for m in memories if not m.get("pinned") and _has_tag(m, "identity")]
+    other = [m for m in memories if not m.get("pinned") and not _has_tag(m, "identity")]
+
+    lines = ["\n## YOUR MEMORY CONTEXT"]
+    lines.append("(These are facts you know about the user and their world. Use them proactively.)\n")
+
+    if pinned:
+        lines.append("### [CRITICAL] Pinned — Always remember")
+        for m in pinned:
+            lines.append(f"- {m['content']}")
+        lines.append("")
+
+    if identity:
+        lines.append("### [HIGH] Identity & Facts")
+        for m in identity[:8]:
+            lines.append(f"- {m['content']}")
+        lines.append("")
+
+    if other:
+        lines.append("### [MEDIUM] Context & Preferences")
+        for m in other[:10]:
+            tags = json.loads(m.get("tags", "[]")) if isinstance(m.get("tags"), str) else m.get("tags", [])
+            tag_str = f" [{', '.join(tags)}]" if tags else ""
+            lines.append(f"- {m['content']}{tag_str}")
+        lines.append("")
 
     return "\n".join(lines)
+
+
+def _has_tag(memory: dict, tag: str) -> bool:
+    """Check if a memory has a specific tag."""
+    tags = memory.get("tags", "[]")
+    if isinstance(tags, str):
+        try:
+            tags = json.loads(tags)
+        except (json.JSONDecodeError, TypeError):
+            return False
+    return tag in tags
 
 
 def deactivate_stale_memories(max_active: int = 30):
@@ -196,7 +228,9 @@ def auto_save_memories(user_message: str) -> list[dict]:
 
 # ─── Skills Manager ────────────────────────────────────────
 
-SKILLS_DIR = os.path.expanduser("~/.artimis/skills")
+SKILLS_DIR = os.path.join(
+    os.environ.get("ARTIMIS_HOME", os.path.expanduser("~/.artimis")), "skills"
+)
 
 
 def ensure_skills_dir():
@@ -372,42 +406,66 @@ def get_relevant_skills(query: str, max_results: int = 5) -> list[dict]:
 
 
 def format_skills_for_prompt(skills: list[dict]) -> str:
-    """Format skills for injection into the system prompt."""
+    """Format skills for injection with tier labels and context budget."""
     if not skills:
         return ""
 
     lines = ["\n## ACTIVE SKILLS"]
-    for s in skills:
-        lines.append(f"\n### Skill: {s['name']} (v{s['version']})")
-        # Include first 1000 chars of skill content
-        content = s['content'][:1000]
-        if len(s['content']) > 1000:
-            content += "\n... (truncated)"
+    lines.append("(Procedures and workflows you know. Reference these when relevant to the task.)\n")
+
+    for s in skills[:3]:  # Cap at 3 skills to stay within context budget
+        pinned_marker = " [PINNED]" if s.get("pinned") else ""
+        lines.append(f"### Skill: {s['name']} (v{s['version']}){pinned_marker}")
+        content = s['content'][:800]
+        if len(s.get('content', '')) > 800:
+            content += "\n... (truncated for context budget)"
         lines.append(content)
+        lines.append("")
 
     return "\n".join(lines)
 
 
-# ─── Brain Context Builder ─────────────────────────────────
+# ─── Context Budget Manager ─────────────────────────────────
+
+MAX_CONTEXT_CHARS = 3000  # Hard cap on brain context injection
 
 def build_brain_context(query: str) -> str:
     """
-    Build the full brain context for injection into the system prompt.
-    Includes relevant memories and skills.
+    Build tiered brain context for injection into the system prompt.
+    Includes relevant memories and skills, capped at MAX_CONTEXT_CHARS.
+    Always includes pinned memories. Adds scored memories and skills up to budget.
     """
     parts = []
 
-    # Memories
-    memories = get_relevant_memories(query)
-    if memories:
-        parts.append(format_memories_for_prompt(memories))
+    # Tier 1: Pinned memories (always included, no cap)
+    pinned = list_memories(pinned=True)
+    if pinned:
+        parts.append(format_memories_for_prompt(pinned))
 
-    # Skills
-    skills = get_relevant_skills(query)
-    if skills:
-        parts.append(format_skills_for_prompt(skills))
+    # Tier 2: Relevant memories (scored, capped by budget)
+    all_memories = list_memories()
+    non_pinned = [m for m in all_memories if m["id"] not in {p["id"] for p in pinned}]
 
-    return "\n".join(parts)
+    scored = []
+    for m in non_pinned:
+        rel = score_memory_relevance(m, query)
+        if rel > 0.05:
+            scored.append((rel, m))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    relevant_mems = pinned + [m for _, m in scored[:15]]
+    mem_text = format_memories_for_prompt(relevant_mems)
+
+    # Tier 3: Skills (only if budget allows)
+    remaining_budget = MAX_CONTEXT_CHARS - len(mem_text)
+    if remaining_budget > 500:
+        skills = get_relevant_skills(query, max_results=3)
+        if skills:
+            skill_text = format_skills_for_prompt(skills)
+            if len(skill_text) <= remaining_budget:
+                mem_text += skill_text
+
+    return mem_text
 
 
 def process_user_message(session_id: str, user_message: str):

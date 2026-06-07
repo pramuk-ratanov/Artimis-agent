@@ -16,8 +16,12 @@ from artimis.engine.tools import TOOL_SCHEMAS, execute_tool
 
 logger = logging.getLogger("artimis.agent")
 
-# Load env vars from ~/.artimis/.env (Artimis' own isolated config)
-_ENV_FILE = os.path.expanduser("~/.artimis/.env")
+# Load env vars from the Artimis home (~/.artimis/.env by default, or
+# $ARTIMIS_HOME/.env inside a container). Artimis' own isolated config.
+_ENV_FILE = os.path.join(
+    os.environ.get("ARTIMIS_HOME", os.path.expanduser("~/.artimis")),
+    ".env",
+)
 if os.path.exists(_ENV_FILE):
     with open(_ENV_FILE) as f:
         for line in f:

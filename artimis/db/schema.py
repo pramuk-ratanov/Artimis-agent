@@ -9,7 +9,10 @@ import os
 import json
 from datetime import datetime, timezone
 
-DB_PATH = os.path.expanduser("~/.artimis/artimis.db")
+DB_PATH = os.path.join(
+    os.environ.get("ARTIMIS_HOME", os.path.expanduser("~/.artimis")),
+    "artimis.db",
+)
 
 
 def get_db() -> sqlite3.Connection:
@@ -178,6 +181,58 @@ CREATE TABLE IF NOT EXISTS custom_agents (
     active          INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0, 1)),
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Uploaded Files
+CREATE TABLE IF NOT EXISTS files (
+    id              TEXT PRIMARY KEY,
+    filename        TEXT NOT NULL,
+    original_name   TEXT NOT NULL,
+    mime_type       TEXT,
+    size_bytes      INTEGER NOT NULL DEFAULT 0,
+    storage_path    TEXT NOT NULL,
+    session_id      TEXT REFERENCES sessions(id) ON DELETE SET NULL,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_files_session ON files(session_id);
+
+-- Harness Self-Improvement
+CREATE TABLE IF NOT EXISTS harness_snapshots (
+    id              TEXT PRIMARY KEY,
+    version         INTEGER NOT NULL,
+    component       TEXT NOT NULL,  -- 'system_prompt', 'tools', 'brain', 'skills'
+    content         TEXT NOT NULL,
+    diff_from_prev  TEXT,           -- unified diff from previous version
+    source          TEXT NOT NULL DEFAULT 'manual' CHECK(source IN ('manual','auto','experiment')),
+    metrics_json    TEXT,           -- JSON: critique_scores, test_results
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_harness_version ON harness_snapshots(version DESC);
+
+CREATE TABLE IF NOT EXISTS harness_experiments (
+    id              TEXT PRIMARY KEY,
+    hypothesis      TEXT NOT NULL,
+    component       TEXT NOT NULL,
+    before_version  INTEGER NOT NULL,
+    after_version   INTEGER,        -- NULL if rejected
+    test_case_ids   TEXT,           -- JSON array of test case IDs used
+    outcome         TEXT NOT NULL DEFAULT 'pending' CHECK(outcome IN ('pending','applied','rejected','error')),
+    score_before    REAL,           -- avg critique score before
+    score_after     REAL,           -- avg critique score after
+    error_message   TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    completed_at    TEXT
+);
+
+CREATE TABLE IF NOT EXISTS test_cases (
+    id              TEXT PRIMARY KEY,
+    input_message   TEXT NOT NULL,
+    expected_traits TEXT NOT NULL,  -- JSON: {must_contain: [...], must_not_contain: [...], min_critique_score: int}
+    source_session  TEXT,           -- session where this test case was created
+    use_count       INTEGER NOT NULL DEFAULT 0,
+    last_used_at    TEXT,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_test_cases_used ON test_cases(last_used_at);
 """
 
 

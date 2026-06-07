@@ -771,7 +771,7 @@ async def remove_webhook(req: WebhookRequest):
 
 # ─── Config ───────────────────────────────────────────────
 
-_ARTIMIS_DIR = os.path.expanduser("~/.artimis")
+_ARTIMIS_DIR = os.environ.get("ARTIMIS_HOME", os.path.expanduser("~/.artimis"))
 _ENV_FILE = os.path.join(_ARTIMIS_DIR, ".env")
 
 _CONFIG_KEYS = [
@@ -976,7 +976,9 @@ async def delete_agent(agent_id: str):
 
 # ─── Files ──────────────────────────────────────────────────
 
-_FILES_DIR = os.path.expanduser("~/.artimis/files")
+_FILES_DIR = os.path.join(
+    os.environ.get("ARTIMIS_HOME", os.path.expanduser("~/.artimis")), "files"
+)
 
 
 @app.post("/api/files/upload")

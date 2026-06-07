@@ -1,0 +1,42 @@
+# Build context excludes — keep the image small and the build fast.
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+env/
+
+# Node — rebuilt inside the image, never copy host artifacts
+web/node_modules/
+web/dist/
+
+# Git & editor
+.git/
+.gitignore
+.vscode/
+.idea/
+*.swp
+
+# Local runtime data (never bake secrets/db into the image)
+.env
+*.db
+*.db-wal
+*.db-shm
+data/
+
+# Docs not needed at runtime
+*.md
+!web/README.md
+
+# CI / install scripts
+install.sh
+uninstall.sh
+artimis.service
+verify_all.py
+crosscheck.py
