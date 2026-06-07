@@ -139,6 +139,27 @@ function App() {
     setProjects(p => [...p, { id: gen(), name: n }])
   }, [])
 
+  const handleArchiveChat = useCallback((id: string) => {
+    api.updateSessionName(id, chats.find(c => c.id === id)?.name || "Archived").catch(() => {})
+    // Optimistically remove from active list — backend marks as archived
+    fetch(`/api/sessions/${id}`, { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({status:"archived"}) }).catch(() => {})
+    setChats(p => p.filter(c => c.id !== id))
+    if (activeChatId === id) {
+      const remaining = chats.filter(c => c.id !== id)
+      if (remaining.length > 0) setActiveChatId(remaining[0].id)
+    }
+  }, [chats, activeChatId])
+
+  const handleDeleteChat = useCallback((id: string) => {
+    api.deleteSession(id).catch(() => {})
+    setChats(p => p.filter(c => c.id !== id))
+    if (activeChatId === id) {
+      const remaining = chats.filter(c => c.id !== id)
+      if (remaining.length > 0) setActiveChatId(remaining[0].id)
+      else handleNewChat()
+    }
+  }, [chats, activeChatId, handleNewChat])
+
   const handleSelectTool = useCallback((t: string) => setActiveTool(t), [])
 
   const handleSend = useCallback(async (text: string) => {
@@ -241,6 +262,7 @@ function App() {
             signalState={signalState} onNewChat={handleNewChat} onSelectChat={handleSelectChat}
             onCreateProject={handleCreateProject} onSelectTool={handleSelectTool}
             onOpenSettings={() => setSettingsOpen(true)} activeTool={activeTool}
+            onArchiveChat={handleArchiveChat} onDeleteChat={handleDeleteChat}
           />
 
           <main className="flex-1 min-w-0 overflow-hidden relative dark-horizon-glow">

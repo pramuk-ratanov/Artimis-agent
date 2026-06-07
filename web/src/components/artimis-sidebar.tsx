@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   Plus, CaretDown, CaretRight, Brain, ImageSquare, Note,
   CheckSquare, Wrench, Database, Palette, Gear, Compass,
+  Archive, Trash, DotsThree,
 } from "@phosphor-icons/react"
 import { LivingSignal, type SignalState } from "@/components/living-signal"
 import { SpotlightButton } from "@/components/ui/spotlight-button"
@@ -33,6 +34,8 @@ interface Props {
   onSelectTool: (t: string) => void
   onOpenSettings: () => void
   activeTool: string | null
+  onArchiveChat: (id: string) => void
+  onDeleteChat: (id: string) => void
 }
 
 interface FolderGroup { name: string; chats: ChatSession[] }
@@ -54,9 +57,128 @@ function groupChats(chats: ChatSession[], projects: Project[]): { unassigned: Ch
   return { unassigned, folders }
 }
 
+/** Inline context menu — appears on hover via the dots button */
+function ChatItemMenu({
+  onArchive, onDelete, onClose
+}: { onArchive: () => void; onDelete: () => void; onClose: () => void }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [onClose])
+
+  return (
+    <div
+      ref={ref}
+      className="absolute right-0 top-full mt-0.5 z-50 bg-surface-2 border border-surface-3
+        rounded-card shadow-lg overflow-hidden min-w-[120px]"
+    >
+      <button
+        onClick={() => { onArchive(); onClose() }}
+        className="w-full flex items-center gap-2 px-3 py-2 text-label font-share
+          text-ink-secondary hover:bg-surface-3 hover:text-ink-primary transition-colors duration-100"
+      >
+        <Archive size={12} weight="regular" className="text-ink-muted" />
+        Archive
+      </button>
+      {!confirmDelete ? (
+        <button
+          onClick={() => setConfirmDelete(true)}
+          className="w-full flex items-center gap-2 px-3 py-2 text-label font-share
+            text-ink-secondary hover:bg-surface-3 hover:text-error transition-colors duration-100"
+        >
+          <Trash size={12} weight="regular" className="text-ink-muted" />
+          Delete
+        </button>
+      ) : (
+        <div className="px-3 py-2 border-t border-surface-3">
+          <p className="text-caption text-ink-muted font-share mb-1.5">Delete forever?</p>
+          <div className="flex gap-1.5">
+            <button
+              onClick={() => { onDelete(); onClose() }}
+              className="flex-1 px-2 py-1 text-caption font-semibold font-share
+                bg-error/20 text-error hover:bg-error/30 rounded-control transition-colors duration-100"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="flex-1 px-2 py-1 text-caption font-share
+                bg-surface-3 text-ink-muted hover:text-ink-secondary rounded-control transition-colors duration-100"
+            >
+              No
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Single chat row with hover-revealed dots menu */
+function ChatItem({
+  chat, isActive, onSelect, onArchive, onDelete
+}: {
+  chat: ChatSession
+  isActive: boolean
+  onSelect: () => void
+  onArchive: () => void
+  onDelete: () => void
+}) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); if (!menuOpen) setMenuOpen(false) }}
+    >
+      <div className={`sidebar-item flex items-center rounded-control font-share
+        ${isActive
+          ? "bg-surface-2 text-ink-primary border border-surface-3"
+          : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
+      >
+        {/* Main click area */}
+        <button
+          onClick={onSelect}
+          className="flex-1 text-left px-2 py-1 text-label truncate min-w-0"
+          title={chat.name}
+        >
+          {chat.name}
+        </button>
+
+        {/* Dots button — only visible on hover or when menu is open */}
+        {(hovered || menuOpen) && (
+          <button
+            onClick={e => { e.stopPropagation(); setMenuOpen(v => !v) }}
+            className="shrink-0 px-1.5 py-1 text-ink-faint hover:text-ink-muted transition-colors duration-100"
+          >
+            <DotsThree size={12} weight="bold" />
+          </button>
+        )}
+      </div>
+
+      {menuOpen && (
+        <ChatItemMenu
+          onArchive={onArchive}
+          onDelete={onDelete}
+          onClose={() => setMenuOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
 export function ArtimisSidebar({
   projects, chats, activeChatId, signalState,
   onNewChat, onSelectChat, onCreateProject, onSelectTool, onOpenSettings, activeTool,
+  onArchiveChat, onDeleteChat,
 }: Props) {
   const [chatsOpen, setChatsOpen] = useState(true)
   const [showingNewProject, setShowingNewProject] = useState(false)
@@ -74,7 +196,7 @@ export function ArtimisSidebar({
 
   return (
     <div className="w-[220px] h-full shrink-0 flex flex-col bg-surface-1 border-r border-surface-3 overflow-hidden">
-      {/* Header — prominent logo */}
+      {/* Header */}
       <div className="px-4 py-3.5 flex items-center gap-3 border-b border-surface-3 shrink-0">
         <LivingSignal state={signalState} />
         <span className="text-body font-bold text-signal-400 tracking-widest uppercase font-share">
@@ -113,16 +235,14 @@ export function ArtimisSidebar({
         {chatsOpen && (
           <div className="ml-1.5 mt-0.5 space-y-0.5">
             {unassigned.map(c => (
-              <button
+              <ChatItem
                 key={c.id}
-                onClick={() => onSelectChat(c.id)}
-                className={`sidebar-item w-full text-left px-2 py-1 text-label rounded-control font-share
-                  ${c.id === activeChatId
-                    ? "bg-surface-2 text-ink-primary border border-surface-3"
-                    : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
-              >
-                {c.name}
-              </button>
+                chat={c}
+                isActive={c.id === activeChatId}
+                onSelect={() => onSelectChat(c.id)}
+                onArchive={() => onArchiveChat(c.id)}
+                onDelete={() => onDeleteChat(c.id)}
+              />
             ))}
 
             {folders.map(f => (
@@ -131,16 +251,14 @@ export function ArtimisSidebar({
                   {f.name} <span className="text-ink-faint ml-1">{f.chats.length}</span>
                 </div>
                 {f.chats.map(c => (
-                  <button
+                  <ChatItem
                     key={c.id}
-                    onClick={() => onSelectChat(c.id)}
-                    className={`sidebar-item w-full text-left px-2 py-1 text-label rounded-control font-share
-                      ${c.id === activeChatId
-                        ? "bg-surface-2 text-ink-primary border border-surface-3"
-                        : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
-                  >
-                    {c.name}
-                  </button>
+                    chat={c}
+                    isActive={c.id === activeChatId}
+                    onSelect={() => onSelectChat(c.id)}
+                    onArchive={() => onArchiveChat(c.id)}
+                    onDelete={() => onDeleteChat(c.id)}
+                  />
                 ))}
               </div>
             ))}
