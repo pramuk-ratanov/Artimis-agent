@@ -3,17 +3,19 @@ Artimis Agent — FastAPI Server
 The API layer between the web UI and the Artimis engine.
 """
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
+from uuid import uuid4
 import json
 import os
 
 from artimis.db.schema import init_db
 from artimis.db import manager as db
+from artimis.db.schema import get_db
 
 app = FastAPI(title="Artimis Agent", version="0.1.0")
 
@@ -769,6 +771,117 @@ async def save_config(req: ConfigRequest):
                 os.environ[key] = val
     _write_env_file(updates)
     return {"saved": True, "keys_updated": list(updates.keys())}
+
+
+# ─── Statistics ───────────────────────────────────────────
+
+@app.get("/api/stats")
+async def get_statistics():
+    """Return user statistics: focus areas, skill development, session patterns."""
+    db = get_db()
+    # Counts
+    total_sessions = db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+    total_messages = db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+    total_memories = db.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+    total_skills = db.execute("SELECT COUNT(*) FROM skills").fetchone()[0]
+
+    # Focus areas: analyze message content for keyword clusters
+    focus_keywords = {
+        "Coding/Development": ["code", "function", "api", "build", "component", "react", "python", "typescript", "error", "fix", "implement", "refactor"],
+        "AI/Prompting": ["prompt", "model", "llm", "agent", "generat", "ai", "gpt", "claude", "deepseek", "openrouter"],
+        "Design/UI": ["design", "ui", "ux", "css", "style", "layout", "color", "button", "sidebar", "card", "theme"],
+        "Business/Marketing": ["marketing", "lead", "client", "sales", "campaign", "freight", "logistics", "shipping"],
+        "Infrastructure": ["server", "deploy", "docker", "database", "api", "endpoint", "config", "port", "sqlite"],
+    }
+    
+    # Count messages per focus area
+    focus_sessions: dict = {}
+    for area, keywords in focus_keywords.items():
+        pattern = " OR ".join([f"content LIKE '%{kw}%'" for kw in keywords])
+        count = db.execute(f"SELECT COUNT(DISTINCT session_id) FROM messages WHERE {pattern}").fetchone()[0]
+        msg_count = db.execute(f"SELECT COUNT(*) FROM messages WHERE {pattern}").fetchone()[0]
+        if count > 0:
+            focus_sessions[area] = {"sessions": count, "messages": msg_count}
+
+    total_focus = sum(v["sessions"] for v in focus_sessions.values()) or 1
+    focus_areas = [
+        {"topic": k, "sessions": v["sessions"], "messages": v["messages"],
+         "percentage": round(v["sessions"] / total_focus * 100, 1)}
+        for k, v in sorted(focus_sessions.items(), key=lambda x: -x[1]["sessions"])
+    ]
+
+    # Top skills: from memories tags
+    tags_raw = db.execute("SELECT tags FROM memories WHERE tags != '[]'").fetchall()
+    tag_counts: dict = {}
+    for (tags_str,) in tags_raw:
+        try:
+            for tag in json.loads(tags_str):
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    top_skills = [{"name": k, "value": v} for k, v in tag_counts.items() if v >= 2][:8]
+    if not top_skills:
+        top_skills = [{"name": "Start chatting to build stats", "value": 1}]
+
+    return {
+        "totalSessions": total_sessions,
+        "totalMessages": total_messages,
+        "totalMemories": total_memories,
+        "totalSkills": total_skills,
+        "topSkills": top_skills,
+        "focusAreas": focus_areas or [{"topic": "No data yet", "sessions": 1, "messages": 0, "percentage": 100}],
+    }
+
+
+# ─── Custom Agents ─────────────────────────────────────────
+
+@app.get("/api/agents")
+async def list_agents():
+    db = get_db()
+    rows = db.execute("SELECT * FROM custom_agents ORDER BY created_at DESC").fetchall()
+    return [dict(r) for r in rows]
+
+
+@app.post("/api/agents")
+async def create_agent(req: Request):
+    db = get_db()
+    body = await req.json()
+    agent_id = str(uuid4())
+    db.execute(
+        "INSERT INTO custom_agents (id, name, description, model, api_key, system_prompt) VALUES (?,?,?,?,?,?)",
+        (agent_id, body["name"], body.get("description"), body["model"],
+         body.get("api_key"), body.get("system_prompt"))
+    )
+    db.commit()
+    row = db.execute("SELECT * FROM custom_agents WHERE id=?", (agent_id,)).fetchone()
+    return dict(row)
+
+
+@app.patch("/api/agents/{agent_id}")
+async def update_agent(agent_id: str, req: Request):
+    db = get_db()
+    body = await req.json()
+    fields = []
+    values = []
+    for k in ["name", "description", "model", "api_key", "system_prompt", "active"]:
+        if k in body:
+            fields.append(f"{k}=?")
+            values.append(body[k])
+    if fields:
+        values.append(agent_id)
+        db.execute(f"UPDATE custom_agents SET {', '.join(fields)} WHERE id=?", tuple(values))
+        db.commit()
+    row = db.execute("SELECT * FROM custom_agents WHERE id=?", (agent_id,)).fetchone()
+    return dict(row) if row else JSONResponse(status_code=404, content={"error": "Not found"})
+
+
+@app.delete("/api/agents/{agent_id}")
+async def delete_agent(agent_id: str):
+    db = get_db()
+    db.execute("DELETE FROM custom_agents WHERE id=?", (agent_id,))
+    db.commit()
+    return {"deleted": True}
 
 
 # ─── Health ───────────────────────────────────────────────

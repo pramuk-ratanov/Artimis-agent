@@ -465,3 +465,47 @@ export function saveConfig(data: ConfigUpdate) {
     body: JSON.stringify(data),
   })
 }
+
+// ── Statistics ──
+
+export interface StatsSummary {
+  totalSessions: number
+  totalMessages: number
+  totalMemories: number
+  totalSkills: number
+  topSkills: { name: string; value: number }[]
+  focusAreas: { topic: string; sessions: number; messages: number; percentage: number }[]
+}
+
+export function getStats() {
+  return fetchJSON<StatsSummary>("/api/stats")
+}
+
+// ── Custom Agents ──
+
+export interface CustomAgent {
+  id: string
+  name: string
+  description?: string
+  model: string
+  api_key?: string
+  system_prompt?: string
+  active: boolean
+  created_at: string
+}
+
+export function getAgents() {
+  return fetchJSON<CustomAgent[]>("/api/agents")
+}
+
+export function createAgent(data: { name: string; description?: string; model: string; api_key?: string; system_prompt?: string }) {
+  return fetchJSON<CustomAgent>("/api/agents", { method: "POST", body: JSON.stringify(data) })
+}
+
+export function updateAgent(id: string, data: Partial<CustomAgent>) {
+  return fetchJSON<CustomAgent>(`/api/agents/${id}`, { method: "PATCH", body: JSON.stringify(data) })
+}
+
+export function deleteAgent(id: string) {
+  return fetchJSON<{ deleted: true }>(`/api/agents/${id}`, { method: "DELETE" })
+}

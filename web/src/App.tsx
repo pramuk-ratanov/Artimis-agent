@@ -17,6 +17,7 @@ import { NotesPanel } from "@/components/panels/notes-panel"
 import { TasksPanel } from "@/components/panels/tasks-panel"
 import { SkillsPanel } from "@/components/panels/skills-panel"
 import { ThemePanel } from "@/components/panels/theme-panel"
+import { StatisticsPanel } from "@/components/panels/statistics-panel"
 import { SettingsModal } from "@/components/panels/settings-modal"
 
 function gen() {
@@ -249,6 +250,7 @@ function App() {
       case "notes": return <NotesPanel />
       case "tasks": return <TasksPanel />
       case "skills": return <SkillsPanel />
+      case "statistics": return <StatisticsPanel />
       case "theme": return <ThemePanel />
       default: return null
     }

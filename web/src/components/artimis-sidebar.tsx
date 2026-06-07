@@ -2,12 +2,11 @@
 
 import { useState, useRef, useEffect } from "react"
 import {
-  Plus, CaretDown, CaretRight, Brain, ImageSquare, Note,
+  CaretDown, CaretRight, Brain, ImageSquare, Note,
   CheckSquare, Wrench, Database, Palette, Gear, Compass,
-  Archive, Trash, DotsThree,
+  Archive, Trash, DotsThree, ChartBar,
 } from "@phosphor-icons/react"
 import { LivingSignal, type SignalState } from "@/components/living-signal"
-import { SpotlightButton } from "@/components/ui/spotlight-button"
 
 export interface Project { id: string; name: string }
 export interface ChatSession { id: string; name: string; projectId: string | null; updatedAt: string }
@@ -20,6 +19,7 @@ const TOOLS = [
   { id: "notes", label: "Notes", icon: <Note size={14} weight="regular" /> },
   { id: "tasks", label: "Tasks", icon: <CheckSquare size={14} weight="regular" /> },
   { id: "skills", label: "Skills", icon: <Wrench size={14} weight="regular" /> },
+  { id: "statistics", label: "Statistics", icon: <ChartBar size={14} weight="regular" /> },
   { id: "theme", label: "Theme", icon: <Palette size={14} weight="regular" /> },
 ]
 
@@ -177,7 +177,7 @@ function ChatItem({
 
 export function ArtimisSidebar({
   projects, chats, activeChatId, signalState,
-  onNewChat, onSelectChat, onCreateProject, onSelectTool, onOpenSettings, activeTool,
+  onNewChat: _onNewChat, onSelectChat, onCreateProject, onSelectTool, onOpenSettings, activeTool,
   onArchiveChat, onDeleteChat,
 }: Props) {
   const [chatsOpen, setChatsOpen] = useState(true)
@@ -202,21 +202,6 @@ export function ArtimisSidebar({
         <span className="text-body font-bold text-signal-400 tracking-widest uppercase font-share">
           Artimis
         </span>
-      </div>
-
-      {/* New Chat */}
-      <div className="p-3 shrink-0">
-        <SpotlightButton className="w-full rounded-control">
-          <button
-            onClick={() => onNewChat(null)}
-            className="w-full flex items-center gap-2 h-9 px-3 rounded-control bg-surface-2 text-label
-              font-medium text-ink-secondary hover:text-ink-primary hover:bg-surface-3
-              border border-transparent transition-all duration-120 ease-expo-out font-sans active:scale-[0.98]"
-          >
-            <Plus size={14} weight="regular" />
-            <span>New Chat</span>
-          </button>
-        </SpotlightButton>
       </div>
 
       {/* Nav scroll */}

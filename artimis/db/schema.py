@@ -166,6 +166,18 @@ CREATE TABLE IF NOT EXISTS user_patterns (
     pattern_data    TEXT NOT NULL,  -- JSON
     detected_at     TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Custom Agents (user-defined AI personalities)
+CREATE TABLE IF NOT EXISTS custom_agents (
+    id              TEXT PRIMARY KEY,
+    name            TEXT NOT NULL,
+    description     TEXT,
+    model           TEXT NOT NULL DEFAULT 'deepseek-v4-pro',
+    api_key         TEXT,
+    system_prompt   TEXT,
+    active          INTEGER NOT NULL DEFAULT 1 CHECK(active IN (0, 1)),
+    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
 """
 
 
