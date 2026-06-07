@@ -51,6 +51,11 @@ function App() {
 
   const activeChat = chats.find(c => c.id === activeChatId) || chats[0]
 
+  // Safety: if chats is empty (all deleted), force a new one
+  useEffect(() => {
+    if (chats.length === 0) handleNewChat()
+  }, [chats.length])
+
   // Intro persistence
   const handleIntroDone = useCallback(() => {
     sessionStorage.setItem("artimis-intro-shown", "1")
@@ -141,24 +146,22 @@ function App() {
 
   const handleArchiveChat = useCallback((id: string) => {
     api.updateSessionName(id, chats.find(c => c.id === id)?.name || "Archived").catch(() => {})
-    // Optimistically remove from active list — backend marks as archived
     fetch(`/api/sessions/${id}`, { method: "PATCH", headers: {"Content-Type":"application/json"}, body: JSON.stringify({status:"archived"}) }).catch(() => {})
-    setChats(p => p.filter(c => c.id !== id))
-    if (activeChatId === id) {
-      const remaining = chats.filter(c => c.id !== id)
-      if (remaining.length > 0) setActiveChatId(remaining[0].id)
-    }
-  }, [chats, activeChatId])
+    setChats(p => {
+      const next = p.filter(c => c.id !== id)
+      if (activeChatId === id && next.length > 0) setActiveChatId(next[0].id)
+      return next
+    })
+  }, [activeChatId, chats])
 
   const handleDeleteChat = useCallback((id: string) => {
     api.deleteSession(id).catch(() => {})
-    setChats(p => p.filter(c => c.id !== id))
-    if (activeChatId === id) {
-      const remaining = chats.filter(c => c.id !== id)
-      if (remaining.length > 0) setActiveChatId(remaining[0].id)
-      else handleNewChat()
-    }
-  }, [chats, activeChatId, handleNewChat])
+    setChats(p => {
+      const next = p.filter(c => c.id !== id)
+      if (activeChatId === id && next.length > 0) setActiveChatId(next[0].id)
+      return next
+    })
+  }, [activeChatId])
 
   const handleSelectTool = useCallback((t: string) => setActiveTool(t), [])
 
