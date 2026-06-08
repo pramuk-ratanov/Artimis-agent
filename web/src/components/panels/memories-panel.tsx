@@ -99,13 +99,22 @@ function MemoryCard({
 }: MemoryCardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false)
 
+  // Deterministic pulse params from memory ID — same card always gets the same rhythm
+  const idHash = m.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
+  const pulseDur = 2.5 + ((idHash % 15) / 10)  // 2.5–3.9s
+  const pulseDelay = (idHash % 20) / 10        // 0–1.9s
+
   return (
     <div
       className={[
-        "bg-surface-1 border border-surface-3 rounded-card p-3 transition-colors duration-150",
+        "bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-3 transition-colors duration-150 card-pulse-glow",
         m.pinned ? "border-l-2 border-l-signal-400" : "",
         !m.active ? "opacity-50" : "",
       ].join(" ")}
+      style={{
+        "--pulse-duration": `${pulseDur}s`,
+        "--pulse-delay": `${pulseDelay}s`,
+      } as React.CSSProperties}
     >
       {/* Content */}
       <p className="text-body text-ink-primary mb-2 leading-relaxed font-share">
@@ -236,7 +245,7 @@ function AddForm({ onAdd, onCancel }: AddFormProps) {
   }
 
   return (
-    <div className="bg-surface-1 border border-signal-600 rounded-card p-3 space-y-2">
+    <div className="bg-surface-1 border border-signal-600 rounded-card card-hover-lift p-3 space-y-2">
       <textarea
         autoFocus
         value={content}
@@ -274,8 +283,6 @@ function AddForm({ onAdd, onCancel }: AddFormProps) {
     </div>
   )
 }
-
-// ── main panel ─────────────────────────────────────────────────────────────
 
 export function MemoriesPanel() {
   const [memories, setMemories] = useState<Memory[]>([])
@@ -419,7 +426,7 @@ export function MemoriesPanel() {
         {loading ? (
           <p className="text-label text-ink-muted font-share">Loading…</p>
         ) : sorted.length === 0 ? (
-          <div className="bg-surface-1 border border-surface-3 rounded-card p-4 text-label text-ink-muted font-share">
+          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted font-share">
             {search || activeTag !== ALL_TAG
               ? "No memories match your filter."
               : "No memories yet. They accumulate as you talk with the agent."}

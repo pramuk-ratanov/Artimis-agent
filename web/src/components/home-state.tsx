@@ -1,6 +1,7 @@
 "use client"
 
-import { Compass, Lightbulb, Scales } from "@phosphor-icons/react"
+import { useState } from "react"
+import { Compass, Lightbulb, Scales, Wrench } from "@phosphor-icons/react"
 
 export function HomeState({ onSend, onOpenTool }: {
   onSend: (text: string) => void
@@ -8,66 +9,103 @@ export function HomeState({ onSend, onOpenTool }: {
 }) {
   const h = new Date().getHours()
   const greeting = h < 6 ? "Good evening." : h < 12 ? "Good morning." : h < 17 ? "Good afternoon." : "Good evening."
+  const [quickPrompt, setQuickPrompt] = useState("")
+
+  const handleSend = (text: string) => {
+    if (!text.trim()) return
+    onSend(text)
+    setQuickPrompt("")
+  }
 
   return (
-    <div className="flex flex-col items-center justify-center h-full px-10">
-      <h1 className="text-display font-semibold tracking-tight text-center mb-10 font-sans" style={{ letterSpacing: "-0.02em" }}>
+    <div className="flex flex-col items-center justify-center h-full px-10 overflow-y-auto">
+      <h1 className="text-display font-semibold tracking-tight text-center mb-2 font-sans" style={{ letterSpacing: "-0.02em" }}>
         {greeting}
       </h1>
+      <p className="text-body text-ink-muted mb-8 font-share">What would you like to work on?</p>
 
-      {/* Bento grid — asymetrical 3-cell layout, per minimalist protocol */}
-      <div className="grid grid-cols-4 gap-3 max-w-[520px] w-full mb-6">
-        {/* Primary card — spans 3 cols */}
+      {/* Quick input */}
+      <div className="max-w-[520px] w-full mb-4">
+        <div className="flex items-stretch bg-surface-1 border border-surface-3 rounded-composer overflow-hidden focus-within:border-signal-400 transition-colors duration-150">
+          <input
+            type="text"
+            value={quickPrompt}
+            onChange={e => setQuickPrompt(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") handleSend(quickPrompt) }}
+            placeholder="Ask anything..."
+            spellCheck={false}
+            autoFocus
+            className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary font-share placeholder:text-ink-muted py-2.5 px-3"
+            style={{ caretColor: "var(--color-signal-500)" }}
+          />
+          <button
+            onClick={() => handleSend(quickPrompt)}
+            disabled={!quickPrompt.trim()}
+            className="px-5 text-label font-medium font-sans transition-all duration-120 ease-expo-out active:scale-[0.97]
+              bg-surface-2 text-ink-primary hover:bg-surface-3 disabled:bg-transparent disabled:text-ink-muted"
+          >
+            Send
+          </button>
+        </div>
+      </div>
+
+      {/* Bento grid */}
+      <div className="grid grid-cols-4 gap-3 max-w-[520px] w-full">
         <button
           onClick={() => onOpenTool("deep-research")}
-          className="col-span-4 md:col-span-3 bg-surface-1 border border-surface-3 rounded-card p-6 text-left
-            hover:border-surface-4 transition-all duration-150 group"
+          className="col-span-4 bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-left group flex items-start gap-3"
         >
-          <div className="w-10 h-10 flex items-center justify-center rounded-control bg-surface-2 mb-4
-            group-hover:bg-surface-3 transition-colors duration-150">
-            <Compass size={18} weight="regular" className="text-signal-400" />
+          <div className="w-9 h-9 flex items-center justify-center rounded-control bg-surface-2 shrink-0 group-hover:bg-surface-3 transition-colors duration-150">
+            <Compass size={16} weight="regular" className="text-signal-400" />
           </div>
-          <div className="text-heading font-semibold text-ink-primary mb-1.5 font-sans" style={{ letterSpacing: "-0.01em" }}>
-            Research deeply
-          </div>
-          <div className="text-body text-ink-secondary font-sans">
-            Multi-source investigation with citations and gap detection
-          </div>
-        </button>
-
-        {/* Secondary cards — each spans 2 cols */}
-        <button
-          onClick={() => onSend("Pressure-test this idea")}
-          className="col-span-4 md:col-span-2 bg-surface-1 border border-surface-3 rounded-card p-5 text-left
-            hover:border-surface-4 transition-all duration-150 group"
-        >
-          <div className="w-10 h-10 flex items-center justify-center rounded-control bg-surface-2 mb-3
-            group-hover:bg-surface-3 transition-colors duration-150">
-            <Scales size={18} weight="regular" className="text-signal-400" />
-          </div>
-          <div className="text-heading font-semibold text-ink-primary mb-1 font-sans" style={{ letterSpacing: "-0.01em" }}>
-            Pressure-test
-          </div>
-          <div className="text-body text-ink-secondary font-sans">
-            Challenge assumptions with critique
+          <div>
+            <div className="text-heading font-semibold text-ink-primary font-sans" style={{ letterSpacing: "-0.01em" }}>Deep Research</div>
+            <div className="text-body text-ink-secondary font-share">Multi-source investigation with citations</div>
           </div>
         </button>
 
         <button
-          onClick={() => onSend("Help me plan something")}
-          className="col-span-4 md:col-span-2 bg-surface-1 border border-surface-3 rounded-card p-5 text-left
-            hover:border-surface-4 transition-all duration-150 group"
+          onClick={() => onSend("Critique this idea from every angle. Find the blind spots, flawed assumptions, and risks I'm missing. Be direct.")}
+          className="col-span-2 bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-3 text-left group"
         >
-          <div className="w-10 h-10 flex items-center justify-center rounded-control bg-surface-2 mb-3
-            group-hover:bg-surface-3 transition-colors duration-150">
-            <Lightbulb size={18} weight="regular" className="text-signal-400" />
+          <div className="w-8 h-8 flex items-center justify-center rounded-control bg-surface-2 mb-2 group-hover:bg-surface-3 transition-colors duration-150">
+            <Scales size={15} weight="regular" className="text-signal-400" />
           </div>
-          <div className="text-heading font-semibold text-ink-primary mb-1 font-sans" style={{ letterSpacing: "-0.01em" }}>
-            Plan something
+          <div className="text-label font-semibold text-ink-primary font-sans">Pressure Test</div>
+          <div className="text-caption text-ink-muted font-share mt-0.5">Challenge assumptions, find blind spots</div>
+        </button>
+
+        <button
+          onClick={() => onSend("Break this down into a step-by-step plan. Include phases, dependencies, and what I should tackle first.")}
+          className="col-span-2 bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-3 text-left group"
+        >
+          <div className="w-8 h-8 flex items-center justify-center rounded-control bg-surface-2 mb-2 group-hover:bg-surface-3 transition-colors duration-150">
+            <Lightbulb size={15} weight="regular" className="text-signal-400" />
           </div>
-          <div className="text-body text-ink-secondary font-sans">
-            Structured breakdown, step by step
+          <div className="text-label font-semibold text-ink-primary font-sans">Plan</div>
+          <div className="text-caption text-ink-muted font-share mt-0.5">Structured breakdown, step by step</div>
+        </button>
+
+        <button
+          onClick={() => onOpenTool("harness-lab")}
+          className="col-span-2 bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-3 text-left group"
+        >
+          <div className="w-8 h-8 flex items-center justify-center rounded-control bg-surface-2 mb-2 group-hover:bg-surface-3 transition-colors duration-150">
+            <Wrench size={15} weight="regular" className="text-signal-400" />
           </div>
+          <div className="text-label font-semibold text-ink-primary font-sans">Harness Lab</div>
+          <div className="text-caption text-ink-muted font-share mt-0.5">Self-improvement experiments</div>
+        </button>
+
+        <button
+          onClick={() => onSend("What patterns have you noticed across our conversations? Surface anything I should know.")}
+          className="col-span-2 bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-3 text-left group"
+        >
+          <div className="w-8 h-8 flex items-center justify-center rounded-control bg-surface-2 mb-2 group-hover:bg-surface-3 transition-colors duration-150">
+            <Compass size={15} weight="regular" className="text-signal-400" />
+          </div>
+          <div className="text-label font-semibold text-ink-primary font-sans">Reflect</div>
+          <div className="text-caption text-ink-muted font-share mt-0.5">Cross-session patterns & insights</div>
         </button>
       </div>
     </div>

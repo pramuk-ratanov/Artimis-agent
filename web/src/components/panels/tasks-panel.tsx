@@ -23,27 +23,27 @@ export function TasksPanel() {
   useEffect(() => { fetchTasks() }, [])
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
+    <div className="flex-1 overflow-y-auto p-8 font-share">
       <div className="max-w-4xl mx-auto">
         <h2 className="text-heading font-semibold text-ink-primary mb-1">Tasks</h2>
-        <p className="text-body text-ink-secondary mb-6" style={{ fontFamily: "var(--font-sans)" }}>
+        <p className="text-body text-ink-secondary mb-6">
           Background task execution. Multi-phase pipeline with pause and resume.
         </p>
         {loading ? (
           <p className="text-label text-ink-muted italic">Loading…</p>
         ) : tasks.length === 0 ? (
-          <div className="bg-surface-1 border border-surface-3 rounded-card p-4 text-label text-ink-muted">
+          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted">
             No tasks. Submit one via the agent or API.
           </div>
         ) : (
           <div className="space-y-2">
             {tasks.map(t => (
-              <div key={t.id} className="bg-surface-1 border border-surface-3 rounded-card p-3">
+              <div key={t.id} className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-3">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-body font-semibold text-ink-primary">{t.title}</p>
                     {t.description && (
-                      <p className="text-label text-ink-secondary mt-0.5" style={{ fontFamily: "var(--font-sans)" }}>
+                      <p className="text-label text-ink-secondary mt-0.5">
                         {t.description}
                       </p>
                     )}

@@ -20,6 +20,7 @@ const TOOLS = [
   { id: "tasks", label: "Tasks", icon: <CheckSquare size={14} weight="regular" /> },
   { id: "skills", label: "Skills", icon: <Wrench size={14} weight="regular" /> },
   { id: "statistics", label: "Statistics", icon: <ChartBar size={14} weight="regular" /> },
+  { id: "harness-lab", label: "Harness Lab", icon: <Wrench size={14} weight="regular" /> },
   { id: "theme", label: "Theme", icon: <Palette size={14} weight="regular" /> },
 ]
 
@@ -133,16 +134,25 @@ function ChatItem({
   const [menuOpen, setMenuOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
 
+  // Deterministic pulse per chat — same rhythm every time
+  const idHash = chat.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
+  const pulseDur = 3 + ((idHash % 15) / 10)   // 3–4.4s
+  const pulseDelay = (idHash % 30) / 10        // 0–2.9s
+
   return (
     <div
       className="relative"
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); if (!menuOpen) setMenuOpen(false) }}
     >
-      <div className={`sidebar-item flex items-center rounded-control font-share
+      <div className={`sidebar-item flex items-center rounded-control font-share card-pulse-glow
         ${isActive
           ? "bg-surface-2 text-ink-primary border border-surface-3"
           : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
+        style={{
+          "--pulse-duration": `${pulseDur}s`,
+          "--pulse-delay": `${pulseDelay}s`,
+        } as React.CSSProperties}
       >
         {/* Main click area */}
         <button

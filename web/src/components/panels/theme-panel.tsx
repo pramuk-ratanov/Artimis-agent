@@ -5,10 +5,10 @@ export function ThemePanel() {
   const signalSwatches = ["#7dd3fc", "#38bdf8", "#0ea5e9", "#0284c7", "#0369a1"]
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
+    <div className="flex-1 overflow-y-auto p-8 font-share">
       <div className="max-w-[65ch] mx-auto">
         <h2 className="text-heading font-semibold text-ink-primary mb-1">Theme</h2>
-        <p className="text-body text-ink-secondary mb-6" style={{ fontFamily: "var(--font-sans)" }}>
+        <p className="text-body text-ink-secondary mb-6">
           Charcoal surfaces + sky-blue signal. Vital Signals DNA. This is the only theme.
         </p>
 

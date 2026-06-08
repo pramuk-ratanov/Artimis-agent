@@ -13,16 +13,16 @@ export function GalleryPanel() {
   }, [])
 
   return (
-    <div className="flex-1 overflow-y-auto p-8">
+    <div className="flex-1 overflow-y-auto p-8 font-share">
       <div className="max-w-4xl mx-auto">
         <h2 className="text-heading font-semibold text-ink-primary mb-1">Gallery</h2>
-        <p className="text-body text-ink-secondary mb-6" style={{ fontFamily: "var(--font-sans)" }}>
+        <p className="text-body text-ink-secondary mb-6">
           Generated images. Quality-passed items have a blue border.
         </p>
         {loading ? (
           <p className="text-label text-ink-muted italic">Loading…</p>
         ) : items.length === 0 ? (
-          <div className="bg-surface-1 border border-surface-3 rounded-card p-4 text-label text-ink-muted">
+          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted">
             No images yet. Generated images from conversations appear here.
           </div>
         ) : (
@@ -30,7 +30,7 @@ export function GalleryPanel() {
             {items.map(item => (
               <div
                 key={item.id}
-                className={`aspect-square bg-surface-1 border rounded-card overflow-hidden flex flex-col
+                className={`aspect-square bg-surface-1 border rounded-card card-hover-lift overflow-hidden flex flex-col
                   ${item.quality_pass ? "border-signal-400" : "border-surface-3"}`}
               >
                 <div className="flex-1 bg-surface-2 flex items-center justify-center text-ink-muted text-caption">

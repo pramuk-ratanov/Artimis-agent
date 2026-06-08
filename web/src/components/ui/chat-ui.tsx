@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback, type KeyboardEvent } from "react"
+import { useState, useRef, useEffect, type KeyboardEvent } from "react"
 import { HomeState } from "@/components/home-state"
 import type { SignalState } from "@/components/living-signal"
 import type { ToolCall } from "@/lib/api"
+import * as api from "@/lib/api"
 import { SpotlightButton } from "@/components/ui/spotlight-button"
 import { PulsePanel } from "@/components/ui/pulse-panel"
 
@@ -21,15 +22,18 @@ interface ChatUIProps {
   onRetry?: () => void
   onOpenTool?: (tool: string) => void
   signalState?: SignalState
-  onStreamingChange?: (streaming: boolean) => void
+  streamingMsgId?: string | null
   placeholder?: string
   isLoading?: boolean
 }
 
 function renderMarkdown(content: string): string {
   return content
-    .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+      const langLabel = lang ? `<span class="code-lang">${lang}</span>` : ""
+      return `<div class="code-block"><div class="code-header">${langLabel}<button class="code-copy-btn" data-code="${encodeURIComponent(code.trim())}">Copy</button></div><pre><code>${code.trim()}</code></pre></div>`
+    })
+    .replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>')
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
@@ -47,55 +51,96 @@ function renderMarkdown(content: string): string {
     .replace(/^(?!<[a-z]|$)(.+)$/gm, '<p>$1</p>')
 }
 
-/** Typewriter: reveals text character-by-character at human reading speed */
-function StreamingMessage({ content, onDone }: { content: string; onDone: () => void }) {
-  const [displayed, setDisplayed] = useState("")
-  const doneRef = useRef(false)
+/** Three-dot typing indicator */
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1.5 py-2 animate-fade-up">
+      <div className="w-2 h-2 rounded-full bg-signal-400 animate-typing-dot" style={{ animationDelay: "0ms" }} />
+      <div className="w-2 h-2 rounded-full bg-signal-400 animate-typing-dot" style={{ animationDelay: "150ms" }} />
+      <div className="w-2 h-2 rounded-full bg-signal-400 animate-typing-dot" style={{ animationDelay: "300ms" }} />
+    </div>
+  )
+}
 
-  useEffect(() => {
-    let i = 0
-    const chars = [...content]
-    // Speed: 2-5 chars per tick at ~15ms = ~200-300 chars/sec (fast reading speed)
-    const timer = setInterval(() => {
-      if (i >= chars.length) {
-        clearInterval(timer)
-        if (!doneRef.current) {
-          doneRef.current = true
-          onDone()
-        }
-        return
-      }
-      const chunkSize = Math.floor(Math.random() * 4) + 2 // 2-5 chars per frame
-      const chunk = chars.slice(i, i + chunkSize).join("")
-      i += chunkSize
-      setDisplayed(prev => prev + chunk)
-    }, 12)
-    return () => clearInterval(timer)
-  }, [content, onDone])
+/** Drag-and-drop file upload zone */
+function FileDrop({ onUploaded }: { onUploaded: (files: { id: string; original_name: string }[]) => void }) {
+  const [dragOver, setDragOver] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadedFiles, setUploadedFiles] = useState<{ id: string; original_name: string }[]>([])
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (!e.dataTransfer.files.length) return
+
+    setUploading(true)
+    try {
+      const result = await api.uploadFiles(e.dataTransfer.files)
+      const files = result.uploaded
+      setUploadedFiles(prev => [...prev, ...files])
+      onUploaded(files)
+    } catch {
+      // silent
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  const handleFilePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.length) return
+    setUploading(true)
+    try {
+      const result = await api.uploadFiles(e.target.files)
+      const files = result.uploaded
+      setUploadedFiles(prev => [...prev, ...files])
+      onUploaded(files)
+    } catch {
+      // silent
+    } finally {
+      setUploading(false)
+    }
+  }
 
   return (
-    <span>
-      <span
-        className="msg-content"
-        dangerouslySetInnerHTML={{ __html: renderMarkdown(displayed) }}
-      />
-      {displayed.length < content.length && (
-        <span className="caret-blink text-signal-400 font-share">_</span>
-      )}
-    </span>
+    <div
+      className={`mb-2 rounded-control border border-dashed transition-all duration-150
+        ${dragOver ? "border-signal-400 bg-surface-2" : "border-surface-3 hover:border-surface-4"}`}
+      onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={handleDrop}
+    >
+      <div className="flex items-center justify-between px-3 py-1.5">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="text-caption font-share text-ink-muted hover:text-signal-400 transition-colors cursor-pointer"
+          >
+            {uploading ? "Uploading..." : dragOver ? "Drop files" : "+ Attach files"}
+          </button>
+          <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFilePick} />
+          {uploadedFiles.length > 0 && (
+            <span className="text-caption text-ink-faint font-share">
+              {uploadedFiles.length} file{uploadedFiles.length > 1 ? "s" : ""} uploaded
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }
 
 export function ChatUI({
-  messages, onSend, onRetry, onOpenTool, signalState: _signalState = "idle", onStreamingChange,
+  messages, onSend, onRetry, onOpenTool, signalState: _signalState = "idle",
+  streamingMsgId = null,
   placeholder = "Message Artimis...", isLoading = false,
 }: ChatUIProps) {
   const [input, setInput] = useState("")
   const [expandedTools, setExpandedTools] = useState<Set<string>>(new Set())
   const feedRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null)
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [showScrollBtn, setShowScrollBtn] = useState(false)
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -107,18 +152,28 @@ export function ChatUI({
     }
   }, [messages])
 
-  // Detect new assistant message and start streaming
+  // Show scroll-to-bottom button when scrolled up
   useEffect(() => {
-    const last = messages[messages.length - 1]
-    if (last && last.role === "assistant" && last.id !== streamingMsgId) {
-      setStreamingMsgId(last.id)
-      onStreamingChange?.(true)
+    const el = feedRef.current
+    if (!el) return
+    const check = () => {
+      if (!el) return
+      const dist = el.scrollHeight - el.scrollTop - el.clientHeight
+      setShowScrollBtn(dist > 200 && messages.length > 2)
     }
-  }, [messages, streamingMsgId, onStreamingChange])
+    el.addEventListener("scroll", check, { passive: true })
+    return () => el.removeEventListener("scroll", check)
+  }, [messages.length])
 
   useEffect(() => {
     if (messages.length === 0) inputRef.current?.focus()
   }, [messages.length])
+
+  const scrollToBottom = () => {
+    if (feedRef.current) {
+      feedRef.current.scrollTo({ top: feedRef.current.scrollHeight, behavior: "smooth" })
+    }
+  }
 
   const handleSend = () => {
     const text = input.trim()
@@ -140,17 +195,12 @@ export function ChatUI({
     })
   }
 
-  const handleStreamDone = useCallback(() => {
-    onStreamingChange?.(false)
-  }, [onStreamingChange])
-
   const handleCopy = async (content: string, msgId: string) => {
     try {
       await navigator.clipboard.writeText(content)
       setCopiedId(msgId)
       setTimeout(() => setCopiedId(null), 2000)
     } catch {
-      // Fallback
       const ta = document.createElement("textarea")
       ta.value = content
       document.body.appendChild(ta)
@@ -162,12 +212,28 @@ export function ChatUI({
     }
   }
 
-  const handleSaveToMemory = async (content: string) => {
-    try {
-      const { createMemory } = await import("@/lib/api")
-      await createMemory(content, [], "manual")
-    } catch {
-      // Best effort
+  // Code block copy via event delegation
+  const handleFeedClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    if (target.classList.contains("code-copy-btn")) {
+      const encoded = target.getAttribute("data-code")
+      if (encoded) {
+        const code = decodeURIComponent(encoded)
+        navigator.clipboard.writeText(code).catch(() => {})
+        target.textContent = "Copied"
+        setTimeout(() => { target.textContent = "Copy" }, 1500)
+      }
+    }
+  }
+
+  // Group consecutive messages from the same role
+  const groupedMessages: ChatMessage[][] = []
+  for (const msg of messages) {
+    const lastGroup = groupedMessages[groupedMessages.length - 1]
+    if (lastGroup && lastGroup[0].role === msg.role && msg.role !== "system") {
+      lastGroup.push(msg)
+    } else {
+      groupedMessages.push([msg])
     }
   }
 
@@ -177,122 +243,145 @@ export function ChatUI({
         <HomeState onSend={onSend} onOpenTool={onOpenTool || (() => {})} />
       ) : (
         <>
-          {/* Messages feed */}
-          <div ref={feedRef} className="relative flex-1 overflow-y-auto px-8 py-6">
-            <div className="max-w-[72ch] mx-auto space-y-6">
-              {messages.map((msg, i) => {
-                const isStreamingMsg = streamingMsgId === msg.id && msg.role === "assistant"
-                const isLast = i === messages.length - 1
+          <div ref={feedRef} className="relative flex-1 overflow-y-auto px-4 md:px-8 py-6" onClick={handleFeedClick}>
+            <div className="max-w-[72ch] mx-auto space-y-5">
+              {groupedMessages.map((group, gi) => {
+                const firstMsg = group[0]
+                const isAssistant = firstMsg.role === "assistant"
+                const isSystem = firstMsg.role === "system"
+
+                if (isSystem) {
+                  return (
+                    <div key={firstMsg.id} className="animate-fade-up" style={{ animationDelay: `${gi * 50}ms` }}>
+                      <div className="bg-surface-1 border border-surface-3 rounded-card px-5 py-3 text-label text-ink-muted italic font-share">
+                        {group.map(m => m.content).join("\n")}
+                      </div>
+                    </div>
+                  )
+                }
 
                 return (
-                  <div key={msg.id} className="animate-fade-up" style={{ animationDelay: `${Math.min(i, 3) * 60}ms` }}>
-                    {/* Timestamp */}
-                    {msg.timestamp && (
-                      <div className={`text-caption text-ink-faint mb-1.5 font-share ${msg.role === "user" ? "text-right" : ""}`}>
-                        {msg.timestamp}
+                  <div key={firstMsg.id} className="animate-fade-up msg-group"
+                    style={{ animationDelay: `${gi * 50}ms` }}>
+                    <div className="flex items-start gap-3">
+                      <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-caption font-bold font-share
+                        ${isAssistant ? "bg-signal-600/20 text-signal-400" : "bg-surface-2 text-ink-muted"}`}>
+                        {isAssistant ? "A" : "U"}
                       </div>
-                    )}
 
-                    {/* System messages */}
-                    {msg.role === "system" && (
-                      <div className="bg-surface-1 border border-surface-3 rounded-card px-5 py-3 text-label text-ink-muted italic font-share">
-                        {msg.content}
-                      </div>
-                    )}
+                      <div className="flex-1 min-w-0">
+                        {group.map((msg, mi) => {
+                          const isStreaming = streamingMsgId === msg.id
+                          const isLastInGroup = mi === group.length - 1
+                          const isLastOverall = gi === groupedMessages.length - 1 && isLastInGroup
 
-                    {/* User messages */}
-                    {msg.role === "user" && (
-                      <div className="flex justify-end">
-                        <div className="msg-turn text-right">
-                          <p className="text-body text-ink-secondary font-share leading-relaxed">
-                            {msg.content}
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                          return (
+                            <div key={msg.id} className={mi > 0 ? "mt-3" : ""}>
+                              {msg.role === "user" ? (
+                                <p className="text-body text-ink-secondary font-share leading-relaxed whitespace-pre-wrap">
+                                  {msg.content}
+                                </p>
+                              ) : (
+                                <div className="group/msg">
+                                  <div className="msg-turn">
+                                    <div
+                                      className="msg-content text-body text-ink-primary leading-relaxed"
+                                      dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) + (isStreaming ? '<span class="typing-cursor" />' : '') }}
+                                    />
+                                  </div>
 
-                    {/* Assistant messages */}
-                    {msg.role === "assistant" && (
-                      <div className="group">
-                        <div className="msg-turn">
-                          {isStreamingMsg ? (
-                            <StreamingMessage content={msg.content} onDone={handleStreamDone} />
-                          ) : (
-                            <div
-                              className="msg-content text-body text-ink-primary font-share leading-relaxed"
-                              dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                            />
-                          )}
-                        </div>
+                                  {msg.tool_calls && msg.tool_calls.length > 0 && (
+                                    <div className="mt-2">
+                                      {msg.tool_calls.map((tc, j) => {
+                                        const tcId = `${msg.id}-tc-${j}`
+                                        const open = expandedTools.has(tcId)
+                                        return (
+                                          <div key={tcId} className="mb-1">
+                                            <button
+                                              onClick={() => toggleToolBlock(tcId)}
+                                              className="flex items-center gap-1.5 text-code font-mono text-ink-muted
+                                                hover:text-ink-secondary transition-colors duration-150"
+                                            >
+                                              <span className="text-[10px]">{open ? "\u25BE" : "\u25B8"}</span>
+                                              <span>{tc.name}</span>
+                                            </button>
+                                            {open && (
+                                              <div className="mt-1 ml-5 p-2 bg-surface-1 border border-surface-3 rounded-control
+                                                text-code font-mono text-ink-muted overflow-x-auto max-h-[160px] overflow-y-auto">
+                                                {JSON.stringify(tc.arguments, null, 2)}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  )}
 
-                        {/* Tool calls block */}
-                        {msg.tool_calls && msg.tool_calls.length > 0 && (
-                          <div className="mt-3">
-                            {msg.tool_calls.map((tc, j) => {
-                              const tcId = `${msg.id}-tc-${j}`
-                              const open = expandedTools.has(tcId)
-                              return (
-                                <div key={tcId} className="mb-1">
-                                  <button
-                                    onClick={() => toggleToolBlock(tcId)}
-                                    className="flex items-center gap-1.5 text-code font-mono text-ink-muted
-                                      hover:text-ink-secondary transition-colors duration-150"
-                                  >
-                                    <span>{open ? "\u25BE" : "\u25B8"}</span>
-                                    <span>{tc.name}</span>
-                                    <span className="text-ink-faint">{"\u00B7"} executed</span>
-                                  </button>
-                                  {open && (
-                                    <div className="mt-1 ml-5 p-2 bg-surface-1 border border-surface-3 rounded-control
-                                      text-code font-mono text-ink-muted overflow-x-auto max-h-[160px] overflow-y-auto">
-                                      {JSON.stringify(tc.arguments, null, 2)}
+                                  {isLastInGroup && !isStreaming && (
+                                    <div className="flex gap-3 mt-1.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150">
+                                      <button
+                                        onClick={() => handleCopy(msg.content, msg.id)}
+                                        className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors"
+                                      >
+                                        {copiedId === msg.id ? "Copied" : "Copy"}
+                                      </button>
+                                      {isLastOverall && onRetry && (
+                                        <button onClick={onRetry}
+                                          className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors">
+                                          Retry
+                                        </button>
+                                      )}
                                     </div>
                                   )}
                                 </div>
-                              )
-                            })}
-                          </div>
-                        )}
+                              )}
 
-                        {/* Hover affordances */}
-                        <div className="flex gap-3 mt-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                          <button
-                            onClick={() => handleCopy(msg.content, msg.id)}
-                            className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors"
-                          >
-                            {copiedId === msg.id ? "Copied" : "Copy"}
-                          </button>
-                          <button
-                            onClick={() => handleSaveToMemory(msg.content)}
-                            className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors"
-                          >
-                            Save to Memory
-                          </button>
-                          {isLast && onRetry && (
-                            <button
-                              onClick={onRetry}
-                              className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors"
-                            >
-                              Retry
-                            </button>
-                          )}
-                        </div>
+                              {msg.timestamp && (
+                                <div className="text-caption text-ink-faint mt-0.5 font-share">
+                                  {msg.timestamp}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
                       </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}
 
+              {/* Typing indicator during tool-calling phase */}
+              {isLoading && !streamingMsgId && (
+                <div className="flex items-start gap-3 animate-fade-up">
+                  <div className="shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-caption font-bold font-share bg-signal-600/20 text-signal-400">
+                    A
+                  </div>
+                  <TypingDots />
+                </div>
+              )}
             </div>
-            {/* Pulse panel — replaces simple Thinking indicator */}
+
+            {showScrollBtn && (
+              <button onClick={scrollToBottom}
+                className="absolute bottom-4 right-6 w-8 h-8 rounded-full bg-surface-2 border border-surface-3
+                  flex items-center justify-center text-ink-muted hover:text-ink-primary hover:bg-surface-3
+                  shadow-sm transition-all duration-150 animate-fade-up">
+                <span className="text-xs">&#8595;</span>
+              </button>
+            )}
+
             <PulsePanel isLoading={isLoading && !streamingMsgId} />
           </div>
         </>
       )}
 
       {/* Composer */}
-      <div className="shrink-0 px-8 pb-6 pt-2">
+      <div className="shrink-0 px-4 md:px-8 pb-6 pt-2">
         <div className="max-w-[72ch] mx-auto">
+          {/* File upload drop zone */}
+          <FileDrop onUploaded={(_files) => {
+            // Files uploaded — agent can now reference them via read_uploaded_file
+          }} />
           <div className="flex items-stretch bg-surface-1 border border-surface-3 rounded-composer
             overflow-hidden focus-within:border-signal-400
             transition-colors duration-150 ease-expo-out">
@@ -305,9 +394,10 @@ export function ChatUI({
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder}
+              placeholder={isLoading ? "Artimis is thinking..." : placeholder}
               disabled={isLoading}
               spellCheck={false}
+              autoComplete="off"
               className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary
                 font-share placeholder:text-ink-muted py-2.5 px-1"
               style={{ caretColor: "var(--color-signal-500)" }}
@@ -318,7 +408,7 @@ export function ChatUI({
                 disabled={!input.trim() || isLoading}
                 className={`px-5 text-label font-medium font-sans transition-all duration-120 ease-expo-out
                   active:scale-[0.97]
-                  ${input.trim()
+                  ${input.trim() && !isLoading
                     ? "bg-surface-2 text-ink-primary hover:bg-surface-3"
                     : "bg-transparent text-ink-muted"}`}
               >
