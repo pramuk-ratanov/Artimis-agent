@@ -284,10 +284,20 @@ export function ChatUI({
                               ) : (
                                 <div className="group/msg">
                                   <div className="msg-turn">
-                                    <div
-                                      className="msg-content text-body text-ink-primary leading-relaxed"
-                                      dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) + (isStreaming ? '<span class="typing-cursor" />' : '') }}
-                                    />
+                                    {isStreaming ? (
+                                      /* During streaming: plain text with typewriter feel.
+                                         Avoids dangerouslySetInnerHTML block-replace flicker.
+                                         Markdown is rendered only after the response completes. */
+                                      <p className="msg-content text-body text-ink-primary font-share leading-relaxed whitespace-pre-wrap">
+                                        {msg.content}<span className="typing-cursor" />
+                                      </p>
+                                    ) : (
+                                      /* Completed: render full markdown */
+                                      <div
+                                        className="msg-content text-body text-ink-primary font-share leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                                      />
+                                    )}
                                   </div>
 
                                   {msg.tool_calls && msg.tool_calls.length > 0 && (
