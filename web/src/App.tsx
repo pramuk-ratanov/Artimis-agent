@@ -20,6 +20,7 @@ import { ThemePanel } from "@/components/panels/theme-panel"
 import { StatisticsPanel } from "@/components/panels/statistics-panel"
 import { HarnessLabPanel } from "@/components/panels/harness-lab-panel"
 import { SettingsModal } from "@/components/panels/settings-modal"
+import { CanvasPanel } from "@/components/panels/canvas-panel"
 import { ToastProvider } from "@/components/ui/toast"
 
 function gen() {
@@ -51,6 +52,7 @@ function App() {
   const [notificationCount, setNotificationCount] = useState(0)
   const [offline, setOffline] = useState(false)
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null)
+  const [canvasState, setCanvasState] = useState<{isOpen: boolean; title: string; content: string}>({isOpen: false, title: "", content: ""})
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   const activeChat = chats.find(c => c.id === activeChatId) || chats[0]
@@ -107,6 +109,43 @@ function App() {
       }
     }).catch(() => {})
   }, [])
+
+  // Rehydrate canvas from active chat messages on chat switch or load
+  useEffect(() => {
+    if (isLoading) return; // Don't interrupt streaming updates
+    const chat = chats.find(c => c.id === activeChatId)
+    if (!chat || chat.messages.length === 0) {
+       setCanvasState(s => s.isOpen ? { ...s, isOpen: false } : s)
+       return
+    }
+    
+    let foundCanvas = false;
+    for (let i = chat.messages.length - 1; i >= 0; i--) {
+       const msg = chat.messages[i];
+       if (msg.tool_calls && Array.isArray(msg.tool_calls)) {
+           const canvasCall = msg.tool_calls.find((t: any) => t.function?.name === 'canvas_update' || t.name === 'canvas_update');
+           if (canvasCall) {
+               try {
+                  const argsRaw = canvasCall.function?.arguments || canvasCall.arguments;
+                  const args = typeof argsRaw === 'string' 
+                     ? JSON.parse(argsRaw) 
+                     : argsRaw;
+                  setCanvasState({
+                     isOpen: true,
+                     title: args.title || "Canvas",
+                     content: args.content || ""
+                  });
+                  foundCanvas = true;
+                  break;
+               } catch(e) {}
+           }
+       }
+    }
+    
+    if (!foundCanvas) {
+        setCanvasState(s => s.isOpen ? { ...s, isOpen: false } : s)
+    }
+  }, [activeChatId, chats, isLoading])
 
   const handleNewChat = useCallback((pid: string | null = null) => {
     // Create local-only chat. Session is only persisted to DB on first message.
@@ -195,6 +234,9 @@ function App() {
 
         if (value.type === "tool") {
           setSignalState("thinking")
+          if (value.name === "canvas_update" && value.args) {
+            setCanvasState({ isOpen: true, title: value.args.title || "Canvas", content: value.args.content || "" })
+          }
         } else if (value.type === "start") {
           setSignalState("streaming")
           if (value.session_id) sessionId = value.session_id
@@ -335,15 +377,26 @@ function App() {
             {activeTool ? (
               renderToolPanel()
             ) : (
-              <ChatUI
-                messages={activeChat.messages}
-                onSend={handleSend}
-                onRetry={handleRetry}
-                onOpenTool={handleSelectTool}
-                signalState={signalState}
-                streamingMsgId={streamingMsgId}
-                isLoading={isLoading}
-              />
+              <div className="flex h-full w-full">
+                <div className={`flex-1 transition-all duration-300 ${canvasState.isOpen ? 'w-1/2 min-w-[400px]' : 'w-full'}`}>
+                  <ChatUI
+                    messages={activeChat.messages}
+                    onSend={handleSend}
+                    onRetry={handleRetry}
+                    onOpenTool={handleSelectTool}
+                    signalState={signalState}
+                    streamingMsgId={streamingMsgId}
+                    isLoading={isLoading}
+                  />
+                </div>
+                {canvasState.isOpen && (
+                  <CanvasPanel 
+                    title={canvasState.title} 
+                    content={canvasState.content} 
+                    onClose={() => setCanvasState(s => ({ ...s, isOpen: false }))} 
+                  />
+                )}
+              </div>
             )}
           </main>
         </div>
