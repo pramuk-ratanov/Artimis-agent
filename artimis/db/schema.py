@@ -233,6 +233,15 @@ CREATE TABLE IF NOT EXISTS test_cases (
     created_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_test_cases_used ON test_cases(last_used_at);
+
+-- Critique Score Trend Tracking
+CREATE TABLE IF NOT EXISTS critique_history (
+    id TEXT PRIMARY KEY,
+    session_id TEXT,
+    score INTEGER NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_critique_history_created ON critique_history(created_at);
 """
 
 

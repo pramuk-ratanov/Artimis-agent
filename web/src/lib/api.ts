@@ -526,6 +526,7 @@ export interface StatsSummary {
   totalSkills: number
   topSkills: { name: string; value: number }[]
   focusAreas: { topic: string; sessions: number; messages: number; percentage: number }[]
+  critiqueTrend: { day: string; avg_score: number; count: number }[]
 }
 
 export function getStats() {

@@ -107,6 +107,13 @@ async def startup():
     except Exception:
         pass  # Non-critical
 
+    # Start harness self-improvement runner
+    try:
+        from artimis.engine.harness_runner import start_harness_runner
+        start_harness_runner(interval_seconds=60)
+    except Exception:
+        pass  # Non-critical
+
 
 # ─── Sessions ─────────────────────────────────────────────
 
@@ -914,6 +921,21 @@ async def get_statistics():
     if not top_skills:
         top_skills = [{"name": "Start chatting to build stats", "value": 1}]
 
+    # Critique score trend
+    critique_trend = []
+    try:
+        rows = db.execute(
+            "SELECT date(created_at) as day, AVG(score) as avg_score, COUNT(*) as count "
+            "FROM critique_history GROUP BY day ORDER BY day DESC LIMIT 30"
+        ).fetchall()
+        critique_trend = [
+            {"day": r["day"], "avg_score": round(r["avg_score"], 2), "count": r["count"]}
+            for r in rows
+        ]
+        critique_trend.reverse()  # chronological order
+    except Exception:
+        pass
+
     return {
         "totalSessions": total_sessions,
         "totalMessages": total_messages,
@@ -921,6 +943,7 @@ async def get_statistics():
         "totalSkills": total_skills,
         "topSkills": top_skills,
         "focusAreas": focus_areas or [{"topic": "No data yet", "sessions": 1, "messages": 0, "percentage": 100}],
+        "critiqueTrend": critique_trend,
     }
 
 
