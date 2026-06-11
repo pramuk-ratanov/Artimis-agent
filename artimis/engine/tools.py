@@ -167,21 +167,11 @@ TOOL_SCHEMAS = [
             }
         }
     },
-    {
-        "type": "function",
-        "function": {
-            "name": "canvas_update",
-            "description": "Update the interactive Canvas/Frame in the UI. Used for displaying code, markdown, or presentations.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "title": {"type": "string", "description": "Title of the canvas."},
-                    "content": {"type": "string", "description": "Markdown or Code content to display."}
-                },
-                "required": ["title", "content"]
-            }
-        }
-    },
+    # canvas_update intentionally removed from TOOL_SCHEMAS.
+    # Large code outputs in JSON tool args cause DeepSeek to produce empty args
+    # and then hang on the subsequent completion call. The frontend detects
+    # ```tsx / ```html blocks in the streamed response and opens the Live Canvas
+    # automatically — no tool invocation needed.
     {
         "type": "function",
         "function": {
