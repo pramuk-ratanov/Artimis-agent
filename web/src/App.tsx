@@ -247,20 +247,12 @@ function App() {
           if (value.session_id) sessionId = value.session_id
         } else if (value.type === "token") {
           responseText += value.content || ""
-          
-          // Auto-open Canvas the moment agent starts writing a UI code block
-          const hasUiCode = responseText.includes("```tsx") || responseText.includes("```html") || responseText.includes("```jsx")
-          if (!canvasState.isOpen && hasUiCode) {
-            setCanvasState({
-              isOpen: true,
-              title: "Live Preview",
-              content: responseText
-            })
-          } else if (canvasState.isOpen) {
-            // Continuously feed live content to canvas during streaming
+
+          // Update canvas content if already open (canvas_update tool opened it)
+          if (canvasState.isOpen) {
             setCanvasState(s => ({ ...s, content: responseText }))
           }
-          
+
           setChats(p => p.map(c => c.id === activeChatId ? {
             ...c,
             messages: c.messages.map(m => m.id === amId ? { ...m, content: responseText } : m),
@@ -403,6 +395,7 @@ function App() {
                     onSend={handleSend}
                     onRetry={handleRetry}
                     onOpenTool={handleSelectTool}
+                    onOpenCanvas={(title, content) => setCanvasState({ isOpen: true, title, content })}
                     signalState={signalState}
                     streamingMsgId={streamingMsgId}
                     isLoading={isLoading}

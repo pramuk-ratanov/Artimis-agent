@@ -21,6 +21,7 @@ interface ChatUIProps {
   onSend: (text: string) => void
   onRetry?: () => void
   onOpenTool?: (tool: string) => void
+  onOpenCanvas?: (title: string, content: string) => void
   signalState?: SignalState
   streamingMsgId?: string | null
   placeholder?: string
@@ -67,6 +68,15 @@ function sanitizeHtml(html: string): string {
     // Outside code blocks: escape < > so the browser shows them as text, not DOM
     return part.replace(/<(?!\/?(?:strong|em|h[1-6]|p|ul|li|ol|blockquote|hr|br|tr|td|th|table|code|pre|div|span)[>\s])/gi, '&lt;')
   }).join('')
+}
+
+/** Extract the first renderable code block (html/tsx/jsx) and return the prose separately */
+function extractCanvasBlock(content: string): { prose: string; canvasCode: string | null; canvasLang: string } {
+  const match = content.match(/```(html|tsx|jsx|react)\n([\s\S]*?)(?:```|$)/)
+  if (!match) return { prose: content, canvasCode: null, canvasLang: '' }
+  // Remove the code block from the prose — replace with nothing
+  const prose = content.replace(match[0], '').trim()
+  return { prose, canvasCode: match[2].trim(), canvasLang: match[1] }
 }
 
 
@@ -149,7 +159,8 @@ function FileDrop({ onUploaded }: { onUploaded: (files: { id: string; original_n
 }
 
 export function ChatUI({
-  messages, onSend, onRetry, onOpenTool, signalState: _signalState = "idle",
+  messages, onSend, onRetry, onOpenTool, onOpenCanvas,
+  signalState: _signalState = "idle",
   streamingMsgId = null,
   placeholder = "Message Artimis...", isLoading = false,
 }: ChatUIProps) {
@@ -293,6 +304,11 @@ export function ChatUI({
                           const isLastInGroup = mi === group.length - 1
                           const isLastOverall = gi === groupedMessages.length - 1 && isLastInGroup
 
+                          // For completed assistant messages, split prose from code
+                          const { prose, canvasCode, canvasLang } = (!isStreaming && msg.role === "assistant")
+                            ? extractCanvasBlock(msg.content)
+                            : { prose: msg.content, canvasCode: null, canvasLang: '' }
+
                           return (
                             <div key={msg.id} className={mi > 0 ? "mt-3" : ""}>
                               {msg.role === "user" ? (
@@ -303,18 +319,30 @@ export function ChatUI({
                                 <div className="group/msg">
                                   <div className="msg-turn">
                                     {isStreaming ? (
-                                      /* During streaming: plain text with typewriter feel.
-                                         Avoids dangerouslySetInnerHTML block-replace flicker.
-                                         Markdown is rendered only after the response completes. */
                                       <p className="msg-content text-body text-ink-primary font-share leading-relaxed whitespace-pre-wrap">
-                                        {msg.content}<span className="typing-cursor" />
+                                        {extractCanvasBlock(msg.content).prose || "Designing…"}<span className="typing-cursor" />
                                       </p>
                                     ) : (
-                                      /* Completed: render full markdown, sanitized */
-                                      <div
-                                        className="msg-content text-body text-ink-primary font-share leading-relaxed"
-                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(msg.content)) }}
-                                      />
+                                      <>
+                                        {prose && (
+                                          <div
+                                            className="msg-content text-body text-ink-primary font-share leading-relaxed"
+                                            dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(prose)) }}
+                                          />
+                                        )}
+                                        {canvasCode && onOpenCanvas && (
+                                          <button
+                                            onClick={() => onOpenCanvas("Live Preview", `\`\`\`${canvasLang}\n${canvasCode}\n\`\`\``)}
+                                            className="mt-3 inline-flex items-center gap-2 px-3 py-2 rounded-control border border-signal-400/40 bg-signal-400/5 hover:bg-signal-400/15 text-signal-400 text-caption font-share transition-colors"
+                                          >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                              <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                              <path d="M9 9l6 3-6 3V9z"/>
+                                            </svg>
+                                            Open in Canvas
+                                          </button>
+                                        )}
+                                      </>
                                     )}
                                   </div>
 
