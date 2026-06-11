@@ -76,8 +76,13 @@ all_mem = db.list_memories()
 check("Memories retrievable", len(all_mem) > 0,
       f"{len(all_mem)} memories in DB")
 
+def safe_load_tags(tag_str):
+    try:
+        return json.loads(tag_str)
+    except json.JSONDecodeError:
+        return []
 # Identity recall
-identity_mems = [m for m in all_mem if "identity" in json.loads(m.get("tags", "[]"))]
+identity_mems = [m for m in all_mem if "identity" in safe_load_tags(m.get("tags", "[]"))]
 check("Identity memories found", len(identity_mems) > 0,
       f"{len(identity_mems)} identity memories")
 

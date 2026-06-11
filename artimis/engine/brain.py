@@ -187,7 +187,7 @@ _SIGNIFICANCE_PATTERNS = [
     (r"(?:I|we)\s+(?:am|are|work)\s+(?:a|an|as|at|for|in)\s+(.{10,80})", "fact"),
     (r"(?:I|we)\s+(?:prefer|like|want|need|use|don't)\s+(.{10,80})", "preference"),
     (r"(?:my|our)\s+(?:project|company|business|product)\s+(?:is|called|named)\s+(.{5,60})", "project"),
-    (r"(?:remember|note|save)\s+(?:this|that)?\s*:?\s*(.{10,200})", "fact"),
+    (r"(?:remember|note|save)(?!\s+to\s+memory\s+that)\s+(?:this|that)?\s*:?\s*(.{10,200})", "fact"),
 ]
 
 

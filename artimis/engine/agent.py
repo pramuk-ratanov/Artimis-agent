@@ -533,6 +533,16 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
 
         final_text = "".join(streamed_parts)
 
+        intelligence_notes = []
+        try:
+            from artimis.engine.intelligence import check_format
+            fmt = check_format(user_message, final_text)
+            if fmt:
+                for note in fmt.get("notes", []):
+                    intelligence_notes.append(f"[format] {note}")
+        except Exception:
+            pass
+
         # ═══ INTELLIGENCE LAYER (parity with run_agent) ═══
         # Run critique + auto-experiment trigger on the streamed response so the
         # meta-harness self-improvement loop fires on the default (streaming) path.
@@ -576,6 +586,8 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
         }
         if critique_score is not None:
             done_payload["critique_score"] = critique_score
+        if intelligence_notes:
+            done_payload["intelligence"] = intelligence_notes
         yield f"data: {json.dumps(done_payload)}\n\n"
         return
 

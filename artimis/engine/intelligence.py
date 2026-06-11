@@ -208,7 +208,11 @@ def detect_drift(
         last_brace = content.rfind('}')
         if last_brace != -1:
             content = content[:last_brace+1]
-        result = json.loads(content)
+        
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError:
+            result = {}
 
         if result.get("drift_detected") and result.get("confidence", 0) > 0.6:
             return {
@@ -311,7 +315,10 @@ def self_critique(
         if content.startswith("```"):
             content = content.split("\n", 1)[1].rsplit("\n", 1)[0]
 
-        result = json.loads(content)
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError:
+            result = {}
 
         return {
             "passed": result.get("passed", True),
@@ -532,9 +539,14 @@ def get_session_orientation(session_id: str, user_message: str) -> str:
     # Relevant memories
     try:
         all_memories = list_memories()
+        def safe_load_tags(tag_str):
+            try:
+                return json.loads(tag_str)
+            except json.JSONDecodeError:
+                return []
         identity_mems = [
             m for m in all_memories
-            if any(t in json.loads(m.get("tags", "[]")) for t in ("identity", "fact", "preference"))
+            if any(t in safe_load_tags(m.get("tags", "[]")) for t in ("identity", "fact", "preference"))
         ]
         if identity_mems:
             parts.append(

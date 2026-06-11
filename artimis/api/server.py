@@ -276,26 +276,28 @@ async def agent_stream_endpoint(req: AgentRequest):
     from artimis.engine.agent import run_agent_streaming
 
     session_id: str = req.session_id or ""
-    session = None
-
-    if session_id:
-        session = db.get_session(session_id)
-
-    if not session:
-        session = db.create_session()
-        session_id = session["id"]
-
-    db.add_message(session_id, "user", req.message)
-
-    messages = db.get_messages(session_id, limit=50)
-    history = []
-    for msg in messages:
-        if msg["role"] in ("user", "assistant"):
-            history.append({"role": msg["role"], "content": msg["content"]})
 
     full_response = []
 
     async def generate():
+        nonlocal session_id
+        session = None
+
+        if session_id:
+            session = db.get_session(session_id)
+
+        if not session:
+            session = db.create_session()
+            session_id = session["id"]
+
+        db.add_message(session_id, "user", req.message)
+
+        messages = db.get_messages(session_id, limit=50)
+        history = []
+        for msg in messages:
+            if msg["role"] in ("user", "assistant"):
+                history.append({"role": msg["role"], "content": msg["content"]})
+
         try:
             for sse_chunk in run_agent_streaming(
                 user_message=req.message,
