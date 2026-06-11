@@ -155,26 +155,36 @@ export function ConversationConstellation() {
         const a = byId.get(e.source), b = byId.get(e.target)
         if (!a || !b) return
         const active = !hv || e.source === hv || e.target === hv
-        ctx.strokeStyle = active
-          ? `oklch(0.40 0.04 230 / ${0.25 + e.weight * 0.5})`
-          : "oklch(0.30 0.01 60 / 0.07)"
-        ctx.lineWidth = active ? 0.6 + e.weight * 1.4 : 0.4
-        ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke()
+        const dimEdge = hv && e.source !== hv && e.target !== hv
+        
+        // Restore Faint Static Edge
+        ctx.strokeStyle = "oklch(60% 0.05 240)"
+        ctx.globalAlpha = dimEdge ? 0.02 : 0.08
+        ctx.lineWidth = 1 + e.weight
+        ctx.beginPath()
+        ctx.moveTo(a.x, a.y)
+        ctx.lineTo(b.x, b.y)
+        ctx.stroke()
+        ctx.globalAlpha = 1
 
-        // Ember pulse: a bright dot sweeping along the edge. Phase offset per
-        // edge so they don't fire in lockstep. Pulses on active edges only.
+        // Ember pulse: a bright dot sweeping along the edge
         if (active) {
           const speed = 0.35 + e.weight * 0.4
           const phase = (t * speed + (idx * 0.137)) % 1
           const px = a.x + (b.x - a.x) * phase
           const py = a.y + (b.y - a.y) * phase
           const glow = hv ? 1 : 0.6
-          const g = ctx.createRadialGradient(px, py, 0, px, py, 6)
-          g.addColorStop(0, EMBER)
-          g.addColorStop(1, "oklch(0.68 0.13 60 / 0)")
-          ctx.fillStyle = g
+          const pulseSize = hv ? 6 + e.weight * 2 : 4 + e.weight * 2
+          
+          // Use simple arc + opacity instead of a new gradient every frame to fix GC stutter
+          ctx.fillStyle = EMBER
+          ctx.globalAlpha = glow * 0.8
+          ctx.beginPath(); ctx.arc(px, py, pulseSize, 0, Math.PI * 2); ctx.fill()
+          
+          // Hot core
           ctx.globalAlpha = glow
-          ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.fill()
+          ctx.fillStyle = "oklch(0.95 0.05 60)"
+          ctx.beginPath(); ctx.arc(px, py, pulseSize * 0.4, 0, Math.PI * 2); ctx.fill()
           ctx.globalAlpha = 1
         }
       })
@@ -208,12 +218,47 @@ export function ConversationConstellation() {
           ctx.font = "11px 'Share Tech Mono', monospace"
           const text = n.label.length > 40 ? n.label.slice(0, 40) + "…" : n.label
           const tw = ctx.measureText(text).width
-          const lx = Math.min(W - tw - 16, n.x + 12)
-          const ly = n.y - 12
+          
+          const countText = String(n.messages || 0)
+          // Dynamically scale inner container if count > 2 digits
+          const countW = ctx.measureText(countText).width
+          const circleRadius = 9
+          const innerWidth = Math.max(circleRadius * 2, countW + 8)
+          const pillPadding = 6
+          const circleMargin = 6
+          const totalWidth = pillPadding + innerWidth + circleMargin + tw + pillPadding
+          const rh = 24
+          
+          const lx = Math.min(W - totalWidth - 16, n.x + 16)
+          const ly = n.y - rh / 2
+          
+          // Pill background
           ctx.fillStyle = "oklch(0.16 0.003 30 / 0.92)"
-          ctx.fillRect(lx - 6, ly - 12, tw + 12, 20)
+          ctx.beginPath()
+          ctx.roundRect(lx, ly, totalWidth, rh, rh / 2)
+          ctx.fill()
+          
+          // Inner colored shape (capsule or circle depending on text length)
+          const cx = lx + pillPadding + innerWidth / 2
+          const cy = ly + rh / 2
+          ctx.fillStyle = TOPIC_COLOR[n.topic] || TOPIC_COLOR.general
+          ctx.beginPath()
+          ctx.roundRect(lx + pillPadding, cy - circleRadius, innerWidth, circleRadius * 2, circleRadius)
+          ctx.fill()
+          
+          // Count text
+          ctx.fillStyle = "oklch(0.15 0.01 30)"
+          ctx.textAlign = "center"
+          ctx.textBaseline = "middle"
+          ctx.fillText(countText, cx, cy)
+          
+          // Label text
+          ctx.textAlign = "left"
           ctx.fillStyle = "oklch(0.93 0.002 60)"
-          ctx.fillText(text, lx, ly + 2)
+          ctx.fillText(text, lx + pillPadding + innerWidth + circleMargin, cy)
+          
+          // Reset
+          ctx.textBaseline = "alphabetic"
         }
       }
 

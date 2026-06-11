@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell } from "recharts"
+import { Bar, XAxis, YAxis, CartesianGrid, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, PieChart, Pie, Cell, ComposedChart, Line, Legend } from "recharts"
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart"
 import * as api from "@/lib/api"
 import { ConversationConstellation } from "@/components/panels/conversation-constellation"
@@ -160,13 +160,16 @@ export function StatisticsPanel() {
       <div>
         <h3 className="text-body font-share text-ink-primary mb-3">Focus Areas</h3>
         <ChartContainer config={focusConfig} className="h-[280px] w-full">
-          <BarChart data={data.focusAreas.map(f => ({ name: f.topic, sessions: f.sessions, messages: f.messages }))} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="oklch(20% 0.01 240)" />
+          <ComposedChart data={data.focusAreas.map(f => ({ name: f.topic, sessions: f.sessions, messages: f.messages }))} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+            <CartesianGrid vertical={true} strokeDasharray="3 3" stroke="oklch(20% 0.01 240)" />
             <XAxis dataKey="name" tick={{ fill: "oklch(60% 0.01 240)", fontSize: 11 }} />
-            <YAxis tick={{ fill: "oklch(60% 0.01 240)", fontSize: 11 }} />
+            <YAxis yAxisId="left" tick={{ fill: "oklch(60% 0.01 240)", fontSize: 11 }} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fill: "oklch(60% 0.01 240)", fontSize: 11 }} />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Bar dataKey="sessions" fill="oklch(65% 0.08 240)" radius={[4, 4, 0, 0]} />
-          </BarChart>
+            <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', color: 'oklch(60% 0.01 240)' }} />
+            <Bar yAxisId="left" name="Messages (Volume)" dataKey="messages" fill="oklch(28% 0.01 240)" radius={[4, 4, 0, 0]} />
+            <Line yAxisId="right" name="Sessions (Count)" type="monotone" dataKey="sessions" stroke="#ff4a4a" strokeWidth={2} dot={{ stroke: '#ff4a4a', strokeWidth: 2, fill: 'black', r: 4 }} />
+          </ComposedChart>
         </ChartContainer>
       </div>
 
