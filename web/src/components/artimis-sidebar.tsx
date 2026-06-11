@@ -145,7 +145,7 @@ function ChatItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); if (!menuOpen) setMenuOpen(false) }}
     >
-      <div className={`sidebar-item flex items-center rounded-control font-share card-pulse-glow
+      <div className={`sidebar-item flex items-center rounded-control font-share
         ${isActive
           ? "bg-surface-2 text-ink-primary border border-surface-3"
           : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
@@ -158,9 +158,9 @@ function ChatItem({
         <button
           onClick={onSelect}
           className="flex-1 text-left px-2 py-1 text-label truncate min-w-0"
-          title={chat.name}
+          title={chat.name || "Empty Session"}
         >
-          {chat.name}
+          {chat.name || "Empty Session"}
         </button>
 
         {/* Dots button — only visible on hover or when menu is open */}

@@ -22,8 +22,13 @@ export interface Message {
 
 export interface ToolCall {
   id: string
-  name: string
-  arguments: Record<string, unknown>
+  name?: string
+  arguments?: Record<string, unknown> | string
+  type?: string
+  function?: {
+    name: string
+    arguments: string | Record<string, unknown>
+  }
 }
 
 export interface AgentResponse {
@@ -254,6 +259,7 @@ export function streamAgentMessage(message: string, sessionId?: string): Promise
 export interface SSEEvent {
   type: "tool" | "token" | "start" | "done" | "error"
   name?: string
+  args?: any
   content?: string
   tool_calls_made?: number
   model?: string

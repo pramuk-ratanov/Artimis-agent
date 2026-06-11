@@ -167,6 +167,21 @@ TOOL_SCHEMAS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "canvas_update",
+            "description": "Update the interactive Canvas/Frame in the UI. Used for displaying code, markdown, or presentations.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string", "description": "Title of the canvas."},
+                    "content": {"type": "string", "description": "Markdown or Code content to display."}
+                },
+                "required": ["title", "content"]
+            }
+        }
+    },
 ]
 
 
@@ -327,14 +342,60 @@ def handle_terminal(args: dict) -> str:
     command = args["command"].strip()
     workdir = args.get("workdir") or os.path.expanduser("~")
 
-    dangerous = ["rm -rf /", "mkfs.", "dd if=", ":(){ :|:& };:", "> /dev/sda", "chmod 777 /", "shutdown", "reboot"]
-    if any(p in command for p in dangerous):
+    normalized_command = " ".join(command.split())
+
+    dangerous_patterns = [
+        "rm -rf /", "rm -fr /", "rm -rf  /", "rm -rf *", "rm -fr *",
+        "mkfs", "dd if=", ":(){ :|:& };:", "> /dev/sda", "chmod 777", "chmod -R 777",
+        "shutdown", "reboot", "poweroff", "init 0", "init 6",
+        "sudo ", "su ", "chown ", "passwd ", "fdisk ", "mkfs.", "/etc/passwd", "/etc/shadow"
+    ]
+    if any(p in normalized_command for p in dangerous_patterns):
         return safe_result(False, error="Command blocked for safety.")
 
     try:
-        result = subprocess.run(command, shell=True, cwd=os.path.expanduser(workdir),
+        import shlex
+        delimiters = [";", "&&", "||", "|"]
+        parts = [command]
+        for d in delimiters:
+            new_parts = []
+            for p in parts:
+                new_parts.extend(p.split(d))
+            parts = new_parts
+
+        for part in parts:
+            part = part.strip()
+            if not part:
+                continue
+            
+            tokens = shlex.split(part)
+            if not tokens:
+                continue
+            
+            executable = os.path.basename(tokens[0])
+            blocked_execs = {
+                "sudo", "su", "passwd", "chsh", "reboot", "shutdown", "poweroff", "halt",
+                "init", "mkfs", "dd", "fdisk", "parted", "mount", "umount", "chown"
+            }
+            if executable in blocked_execs:
+                return safe_result(False, error=f"Command executable '{executable}' is blocked for safety.")
+            
+            if executable == "rm":
+                for t in tokens[1:]:
+                    if t.startswith("-"):
+                        continue
+                    resolved = os.path.abspath(os.path.expanduser(t))
+                    if resolved in ("/", "/home", "/etc", "/var", "/usr", "/bin", "/sbin", "/boot"):
+                        return safe_result(False, error="Command blocked: attempting to delete a system directory.")
+    except Exception as e:
+        return safe_result(False, error=f"Command validation failed: {str(e)}")
+
+    try:
+        result = subprocess.run(
+            command, shell=True, cwd=os.path.expanduser(workdir),
             capture_output=True, text=True, timeout=30,
-            env={**os.environ, "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")})
+            env={**os.environ, "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin")}
+        )
         output = result.stdout
         if result.stderr:
             output += "\n[STDERR]\n" + result.stderr
@@ -442,6 +503,11 @@ def handle_harness_experiment(args: dict) -> str:
         return safe_result(False, error=str(e))
 
 
+def handle_canvas_update(args: dict) -> str:
+    _validate_required(args, ["title", "content"], "canvas_update")
+    return safe_result(True, data={"updated": True, "title": args["title"], "content_length": len(args["content"])})
+
+
 # ─── Tool Registry ──────────────────────────────────────────
 
 TOOL_HANDLERS = {
@@ -455,6 +521,7 @@ TOOL_HANDLERS = {
     "read_uploaded_file": handle_read_uploaded_file,
     "harness_snapshot": handle_harness_snapshot,
     "harness_experiment": handle_harness_experiment,
+    "canvas_update": handle_canvas_update,
 }
 
 

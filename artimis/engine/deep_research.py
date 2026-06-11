@@ -16,9 +16,30 @@ Architecture from the deep-research report:
 import json
 import logging
 from typing import Optional
-from artimis.engine.agent import run_agent
 
 logger = logging.getLogger("artimis.deep_research")
+
+
+def run_direct_llm(prompt: str, system_prompt: Optional[str] = None) -> str:
+    """Helper to run a non-agentic, deterministic LLM call to avoid recursion and tools overhead."""
+    try:
+        from artimis.engine.agent import _get_client, DEFAULT_MODEL
+        model_name = DEFAULT_MODEL
+        client = _get_client(model_name)
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+        
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=messages,
+            temperature=0.2, # Low temperature ensures high consistency
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        logger.error(f"Direct LLM call failed: {e}")
+        raise
 
 
 # ─── Phase 1: Planner ───────────────────────────────────────
@@ -54,16 +75,13 @@ Do not draft conclusions yet. Only plan the investigation."""
 
 def plan_research(task: str) -> dict:
     """Decompose a research task into subquestions and source strategy."""
-    result = run_agent(
-        user_message=f"{PLANNER_PROMPT}\n\nTask: {task}",
-        max_iterations=5,
+    response = run_direct_llm(
+        system_prompt=PLANNER_PROMPT,
+        prompt=f"Task: {task}"
     )
-
-    response = result["response"]
 
     # Try to parse JSON from response
     try:
-        # Find JSON block in response
         start = response.find("{")
         end = response.rfind("}") + 1
         if start >= 0 and end > start:
@@ -72,7 +90,6 @@ def plan_research(task: str) -> dict:
     except (json.JSONDecodeError, KeyError):
         pass
 
-    # Fallback: use raw response as plan
     return {
         "overall_approach": response[:200],
         "subquestions": [
@@ -86,28 +103,47 @@ def plan_research(task: str) -> dict:
 # ─── Phase 2: Retriever ─────────────────────────────────────
 
 def retrieve_for_subquestion(subquestion: dict) -> list[dict]:
-    """Search for evidence on a single subquestion."""
+    """Search for evidence on a single subquestion safely and synchronously."""
     question = subquestion.get("question", "")
     source_classes = subquestion.get("source_classes", ["web"])
 
     results = []
 
-    for source_class in source_classes[:3]:  # Max 3 source types per question
+    for source_class in source_classes[:3]:
         search_query = f"{question}"
-
         if source_class == "news":
             search_query += " news latest"
 
-        search_result = run_agent(
-            user_message=f"Search the web for: {search_query}\nReturn the top 3 most relevant results with URLs and key findings. Format each as:\n\nSOURCE: [title]\nURL: [url]\nKEY FINDINGS: [2-3 bullet points]\nCREDIBILITY: [high/medium/low with reason]",
-            max_iterations=3,
+        # Execute search tool synchronously and securely without running a nested agent
+        try:
+            from artimis.engine.tools import execute_tool
+            search_data = execute_tool("web_search", {"query": search_query})
+        except Exception as e:
+            search_data = json.dumps({"error": str(e)})
+
+        # Extract and format findings using direct non-agentic LLM
+        prompt = f"""Search Query: {search_query}
+Raw Search Results:
+{search_data[:12000]}
+
+Please extract the top 3 most relevant results with URLs and key findings.
+Format each exactly as:
+
+SOURCE: [title]
+URL: [url]
+KEY FINDINGS: [2-3 bullet points]
+CREDIBILITY: [high/medium/low with reason]"""
+
+        summary = run_direct_llm(
+            system_prompt="You are a precise search results analyst. Your job is to extract and summarize key findings from raw search data.",
+            prompt=prompt
         )
 
         results.append({
             "question": question,
             "source_class": source_class,
-            "raw_response": search_result["response"],
-            "tool_calls": search_result.get("tool_calls_made", 0),
+            "raw_response": summary,
+            "tool_calls": 1,
         })
 
     return results
@@ -147,18 +183,15 @@ Be rigorous. Flag weak sources."""
 
 def verify_evidence(retrieval_results: list[dict]) -> dict:
     """Verify claims across all retrieved evidence."""
-    # Concatenate raw responses for verification
     evidence_text = "\n\n---\n\n".join([
         f"SUBQUESTION: {r['question']}\nSOURCE CLASS: {r['source_class']}\n{r['raw_response']}"
         for r in retrieval_results
     ])
 
-    result = run_agent(
-        user_message=f"{VERIFIER_PROMPT}\n\nEVIDENCE TO VERIFY:\n\n{evidence_text[:8000]}",
-        max_iterations=5,
+    response = run_direct_llm(
+        system_prompt=VERIFIER_PROMPT,
+        prompt=f"EVIDENCE TO VERIFY:\n\n{evidence_text[:8000]}"
     )
-
-    response = result["response"]
 
     try:
         start = response.find("{")
@@ -224,12 +257,12 @@ VERIFICATION RESULTS:
 
 Write a comprehensive research memo based on the verified evidence above."""
 
-    result = run_agent(
-        user_message=f"{SYNTHESIZER_PROMPT}\n\n{context}",
-        max_iterations=5,
+    response = run_direct_llm(
+        system_prompt=SYNTHESIZER_PROMPT,
+        prompt=context
     )
 
-    return result["response"]
+    return response
 
 
 # ─── Full Pipeline ──────────────────────────────────────────

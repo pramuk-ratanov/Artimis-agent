@@ -9,6 +9,8 @@ from fastapi.responses import StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
+from contextlib import closing
+import secrets
 from uuid import uuid4
 import json
 import os
@@ -25,6 +27,55 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def api_key_auth_middleware(request: Request, call_next):
+    """
+    Secure all '/api' routes (excluding health check) if 'ARTIMIS_API_KEY' is configured.
+    Supports standard 'X-API-Key' header and 'Authorization: Bearer <token>'.
+    """
+    path = request.url.path
+    if path.startswith("/api") and path != "/api/health":
+        expected_key = os.getenv("ARTIMIS_API_KEY") or _read_env_file().get("ARTIMIS_API_KEY")
+        
+        if expected_key:
+            api_key = request.headers.get("X-API-Key")
+            
+            # Check Bearer Authorization fallback
+            if not api_key:
+                auth_header = request.headers.get("Authorization")
+                if auth_header and auth_header.startswith("Bearer "):
+                    api_key = auth_header[len("Bearer "):]
+            
+            # Constant-time comparison to mitigate timing side-channel attacks
+            if not api_key or not secrets.compare_digest(api_key, expected_key):
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Invalid or missing API Key"}
+                )
+                
+    response = await call_next(request)
+    return response
+
+
+def _read_env_file() -> dict:
+    env_path = os.path.expanduser("~/.artimis/.env")
+    if not os.path.exists(env_path):
+        env_path = ".env"
+    if not os.path.exists(env_path):
+        return {}
+    res = {}
+    try:
+        with open(env_path, "r") as f:
+            for line in f:
+                if "=" in line and not line.strip().startswith("#"):
+                    k, v = line.strip().split("=", 1)
+                    res[k.strip()] = v.strip().strip('"').strip("'")
+    except Exception:
+        pass
+    return res
+
 
 
 # ─── Request Models ────────────────────────────────────────
@@ -285,6 +336,7 @@ async def agent_stream_endpoint(req: AgentRequest):
     session_id: str = req.session_id or ""
 
     full_response = []
+    tool_calls = []
 
     async def generate():
         nonlocal session_id
@@ -313,11 +365,20 @@ async def agent_stream_endpoint(req: AgentRequest):
                 model=session.get("model"),
             ):
                 # Accumulate full response from tokens
-                if "token" in sse_chunk:
+                if "token" in sse_chunk or "tool" in sse_chunk:
                     try:
-                        data = json.loads(sse_chunk.replace("data: ", ""))
+                        data = json.loads(sse_chunk.replace("data: ", "", 1))
                         if data.get("type") == "token":
-                            full_response.append(data["content"])
+                            full_response.append(data.get("content", ""))
+                        elif data.get("type") == "tool":
+                            tool_calls.append({
+                                "id": f"call_{uuid4().hex[:8]}",
+                                "type": "function",
+                                "function": {
+                                    "name": data.get("name"),
+                                    "arguments": json.dumps(data.get("args", {}))
+                                }
+                            })
                     except json.JSONDecodeError:
                         pass
 
@@ -325,8 +386,13 @@ async def agent_stream_endpoint(req: AgentRequest):
 
             # Save the full assistant response
             complete = "".join(full_response)
-            if complete:
-                db.add_message(session_id, "assistant", complete)
+            if complete or tool_calls:
+                db.add_message(
+                    session_id, 
+                    "assistant", 
+                    complete if complete else None,
+                    tool_calls=tool_calls if tool_calls else None
+                )
 
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
@@ -877,38 +943,32 @@ async def save_config(req: ConfigRequest):
 @app.get("/api/stats")
 async def get_statistics():
     """Return user statistics: focus areas, skill development, session patterns."""
-    db = get_db()
-    # Counts
-    total_sessions = db.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
-    total_messages = db.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
-    total_memories = db.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
-    total_skills = db.execute("SELECT COUNT(*) FROM skills").fetchone()[0]
+    with closing(get_db()) as conn:
+        # Counts
+        total_sessions = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+        total_messages = conn.execute("SELECT COUNT(*) FROM messages").fetchone()[0]
+        total_memories = conn.execute("SELECT COUNT(*) FROM memories").fetchone()[0]
+        total_skills = conn.execute("SELECT COUNT(*) FROM skills").fetchone()[0]
 
-    # Focus areas: analyze message content for keyword clusters
-    focus_keywords = {
-        "Coding/Development": ["code", "function", "api", "build", "component", "react", "python", "typescript", "error", "fix", "implement", "refactor"],
-        "AI/Prompting": ["prompt", "model", "llm", "agent", "generat", "ai", "gpt", "claude", "deepseek", "openrouter"],
-        "Design/UI": ["design", "ui", "ux", "css", "style", "layout", "color", "button", "sidebar", "card", "theme"],
-        "Business/Marketing": ["marketing", "lead", "client", "sales", "campaign", "freight", "logistics", "shipping"],
-        "Infrastructure": ["server", "deploy", "docker", "database", "api", "endpoint", "config", "port", "sqlite"],
-    }
-    
-    # Count messages per focus area
-    focus_sessions: dict = {}
-    for area, keywords in focus_keywords.items():
-        pattern = " OR ".join([f"content LIKE '%{kw}%'" for kw in keywords])
-        count = db.execute(f"SELECT COUNT(DISTINCT session_id) FROM messages WHERE {pattern}").fetchone()[0]
-        msg_count = db.execute(f"SELECT COUNT(*) FROM messages WHERE {pattern}").fetchone()[0]
-        if count > 0:
-            focus_sessions[area] = {"sessions": count, "messages": msg_count}
-
-    total_focus = sum(v["sessions"] for v in focus_sessions.values()) or 1
-    focus_areas = [
-        {"topic": k, "sessions": v["sessions"], "messages": v["messages"],
-         "percentage": round(v["sessions"] / total_focus * 100, 1)}
-        for k, v in sorted(focus_sessions.items(), key=lambda x: -x[1]["sessions"])
-    ]
-
+        # Focus areas: analyze message content for keyword clusters
+        focus_keywords = {
+            "Coding/Development": ["code", "function", "api", "build", "component", "react", "python", "typescript", "error", "fix", "implement", "refactor"],
+            "AI/Prompting": ["prompt", "model", "llm", "agent", "generat", "ai", "gpt", "claude", "deepseek", "openrouter"],
+            "Design/UI": ["design", "ui", "ux", "css", "style", "layout", "color", "button", "sidebar", "card", "theme"],
+            "Business/Marketing": ["marketing", "lead", "client", "sales", "campaign", "freight", "logistics", "shipping"],
+            "Infrastructure": ["server", "deploy", "docker", "database", "api", "endpoint", "config", "port", "sqlite"],
+        }
+        
+        # Count messages per focus area (Fully Parameterized - Safe from SQLi)
+        focus_sessions: dict = {}
+        for area, keywords in focus_keywords.items():
+            pattern = " OR ".join(["content LIKE ?" for _ in keywords])
+            params = [f"%{kw}%" for kw in keywords]
+            
+            count = conn.execute(f"SELECT COUNT(DISTINCT session_id) FROM messages WHERE {pattern}", params).fetchone()[0]
+            msg_count = conn.execute(f"SELECT COUNT(*) FROM messages WHERE {pattern}", params).fetchone()[0]
+            if count > 0:
+                focus_sessions[area] = {"sessions": count, "messages": msg_count}
     # Top skills: from memories tags
     tags_raw = db.execute("SELECT tags FROM memories WHERE tags != '[]'").fetchall()
     tag_counts: dict = {}
@@ -1054,8 +1114,8 @@ async def get_conversation_graph(limit: int = 60):
 
 @app.get("/api/agents")
 async def list_agents():
-    db = get_db()
-    rows = db.execute("SELECT * FROM custom_agents ORDER BY created_at DESC").fetchall()
+    with closing(get_db()) as conn:
+        rows = conn.execute("SELECT * FROM custom_agents ORDER BY created_at DESC").fetchall()
     return [dict(r) for r in rows]
 
 
@@ -1069,7 +1129,7 @@ async def create_agent(req: Request):
         (agent_id, body["name"], body.get("description"), body["model"],
          body.get("api_key"), body.get("system_prompt"))
     )
-    db.commit()
+    conn.commit()
     row = db.execute("SELECT * FROM custom_agents WHERE id=?", (agent_id,)).fetchone()
     return dict(row)
 
@@ -1087,7 +1147,7 @@ async def update_agent(agent_id: str, req: Request):
     if fields:
         values.append(agent_id)
         db.execute(f"UPDATE custom_agents SET {', '.join(fields)} WHERE id=?", tuple(values))
-        db.commit()
+        conn.commit()
     row = db.execute("SELECT * FROM custom_agents WHERE id=?", (agent_id,)).fetchone()
     return dict(row) if row else JSONResponse(status_code=404, content={"error": "Not found"})
 
@@ -1096,7 +1156,7 @@ async def update_agent(agent_id: str, req: Request):
 async def delete_agent(agent_id: str):
     db = get_db()
     db.execute("DELETE FROM custom_agents WHERE id=?", (agent_id,))
-    db.commit()
+    conn.commit()
     return {"deleted": True}
 
 

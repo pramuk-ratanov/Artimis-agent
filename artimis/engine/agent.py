@@ -252,7 +252,7 @@ def run_agent(
 
         # Tier 3: Self-Critique — with regeneration loop
         critique = None
-        intelligence_notes = []
+        # Do not reset intelligence_notes to keep Tier 1 & Tier 2 logs
         best_response = response_text
         best_critique = None
         best_score = 0
@@ -385,7 +385,7 @@ def run_agent(
             "model_used": model_name,
             "intelligence": intelligence_notes if intelligence_notes else None,
             "critique": best_critique,
-            "regenerations": RETRY_LIMIT - retry if retry > 0 else 0,
+            "regenerations": retry,
         }
 
     # Max iterations reached
@@ -480,7 +480,7 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                     tool_args = {}
 
                 # Yield tool call status
-                yield f"data: {json.dumps({'type': 'tool', 'name': tool_name})}\n\n"
+                yield f"data: {json.dumps({'type': 'tool', 'name': tool_name, 'args': tool_args})}\n\n"
 
                 result = execute_tool(tool_name, tool_args)
                 tool_calls_made += 1
@@ -537,13 +537,48 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
             pass
 
         # ═══ INTELLIGENCE LAYER (parity with run_agent) ═══
-        # Run critique + auto-experiment trigger on the streamed response so the
-        # meta-harness self-improvement loop fires on the default (streaming) path.
+        intelligence_notes = []
+
+        # ═══ CURIOSITY ENGINE (parity with run_agent) ═══
+        try:
+            from artimis.engine.curiosity import check_patterns
+            curiosity_note = check_patterns(session_id, user_message)
+            if curiosity_note:
+                curiosity_payload = f"\n\n{curiosity_note}"
+                final_text += curiosity_payload
+                yield f"data: {json.dumps({'type': 'token', 'content': curiosity_payload})}\n\n"
+                intelligence_notes.append("[curiosity] surfaced cross-session pattern")
+        except Exception:
+            pass
+
+        # ═══ FORMAT CHECK (parity with run_agent) ═══
+        try:
+            from artimis.engine.intelligence import check_format
+            fmt = check_format(user_message, final_text)
+            if fmt:
+                for note in fmt.get("notes", []):
+                    intelligence_notes.append(f"[format] {note}")
+        except Exception:
+            pass
+
+        # ═══ INTELLIGENCE LAYER (parity with run_agent) ═══
         critique_score = None
         try:
             from artimis.engine.intelligence import self_critique, learn_from_critique
             critique = self_critique(user_message, final_text, tool_calls_made)
             critique_score = critique.get("overall_score", 7)
+            intelligence_notes.append(f"[critique:score] {critique_score}/10")
+
+            if not critique.get("passed", True):
+                issues = critique.get("issues", [])
+                for issue in issues:
+                    if isinstance(issue, dict):
+                        intelligence_notes.append(
+                            f"[critique:{issue.get('severity', 'minor')}] {issue.get('description', str(issue))}"
+                        )
+                    else:
+                        intelligence_notes.append(f"[critique] {str(issue)}")
+
             try:
                 learn_from_critique(critique, user_message, session_id)
             except Exception:
@@ -565,7 +600,7 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
             except Exception:
                 pass
 
-        # Auto-experiment trigger: low critique score → create harness experiment
+        # Auto-experiment trigger
         if critique_score is not None and critique_score < 6 and session_id:
             try:
                 from artimis.db.schema import get_db, generate_id
@@ -576,9 +611,9 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                 if pending == 0:
                     exp_id = generate_id()
                     conn.execute(
-                        """INSERT INTO harness_experiments (id, hypothesis, component, before_version, outcome)
-                           VALUES (?,?,?, (SELECT COALESCE(MAX(version),0) FROM harness_snapshots WHERE component='system_prompt'), 'pending')""",
-                        (exp_id, f"Auto-triggered (streaming): critique score {critique_score}/10. Hypothesis: system_prompt needs refinement for this type of query.", "system_prompt")
+                        "INSERT INTO harness_experiments (id, hypothesis, component, before_version, outcome) "
+                        "VALUES (?,?,?, (SELECT COALESCE(MAX(version),0) FROM harness_snapshots WHERE component='system_prompt'), 'pending')",
+                        (exp_id, f"Auto-triggered (streaming): critique score {critique_score}/10. Hypothesis: system_prompt needs refinement.", "system_prompt")
                     )
                     conn.commit()
                 conn.close()
