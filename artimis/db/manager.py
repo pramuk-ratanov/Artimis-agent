@@ -68,10 +68,11 @@ def add_message(session_id: str, role: str, content: Optional[str] = None,
         return {"id": msg_id, "session_id": session_id, "role": role, "content": content}
 
 
-def get_messages(session_id: str, limit: int = 100, offset: int = 0) -> list[dict]:
+def get_messages(session_id: str, limit: int = 100, offset: int = 0, desc: bool = False) -> list[dict]:
     with closing(get_db()) as conn:
+        order = "DESC" if desc else "ASC"
         rows = conn.execute(
-            "SELECT * FROM messages WHERE session_id = ? ORDER BY id LIMIT ? OFFSET ?",
+            f"SELECT * FROM messages WHERE session_id = ? ORDER BY id {order} LIMIT ? OFFSET ?",
             (session_id, limit, offset)
         ).fetchall()
         
@@ -81,21 +82,29 @@ def get_messages(session_id: str, limit: int = 100, offset: int = 0) -> list[dic
             if d.get("tool_calls"):
                 try:
                     d["tool_calls"] = json.loads(d["tool_calls"])
-                except Exception:
+                except json.JSONDecodeError:
                     pass
             result.append(d)
+        
+        if desc:
+            result.reverse()  # Restore chronological order for history
+            
         return result
 
 
 # ─── Memories ──────────────────────────────────────────────
 
 def create_memory(content: str, tags: Optional[list] = None, source: str = "auto") -> dict:
+    from artimis.engine.embeddings import get_embedding
+    emb = get_embedding(content)
+    emb_json = json.dumps(emb) if emb else None
+
     with closing(get_db()) as conn:
         mid = generate_id()
         tags_json = json.dumps(tags or [])
         conn.execute(
-            "INSERT INTO memories (id, content, tags, source) VALUES (?, ?, ?, ?)",
-            (mid, content, tags_json, source)
+            "INSERT INTO memories (id, content, tags, source, embedding) VALUES (?, ?, ?, ?, ?)",
+            (mid, content, tags_json, source, emb_json)
         )
         conn.commit()
         return get_memory(mid)
@@ -133,8 +142,12 @@ def update_memory(memory_id: str, content: Optional[str] = None, tags: Optional[
                   pinned: Optional[bool] = None, active: Optional[bool] = None) -> Optional[dict]:
     with closing(get_db()) as conn:
         if content is not None:
-            conn.execute("UPDATE memories SET content = ?, updated_at = ? WHERE id = ?",
-                         (content, now(), memory_id))
+            from artimis.engine.embeddings import get_embedding
+            emb = get_embedding(content)
+            emb_json = json.dumps(emb) if emb else None
+            
+            conn.execute("UPDATE memories SET content = ?, embedding = ?, updated_at = ? WHERE id = ?",
+                         (content, emb_json, now(), memory_id))
         if tags is not None:
             conn.execute("UPDATE memories SET tags = ?, updated_at = ? WHERE id = ?",
                          (json.dumps(tags), now(), memory_id))

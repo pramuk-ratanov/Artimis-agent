@@ -229,6 +229,37 @@ async def get_session_messages(session_id: str, limit: int = 100, offset: int = 
     return db.get_messages(session_id, limit=limit, offset=offset)
 
 
+def _build_context_history(session_id: str, session: dict) -> list:
+    """
+    Build conversation history for context, applying context distillation.
+    If the session has a summary, prepend it. Limit to last 20 messages.
+    """
+    messages = db.get_messages(session_id, limit=20, desc=True)
+    history = []
+    
+    # Inject distilled summary if available
+    summary = session.get("summary")
+    if summary:
+        history.append({
+            "role": "system", 
+            "content": f"## PREVIOUS CONVERSATION SUMMARY\nThe earlier part of this conversation was distilled into this summary:\n{summary}"
+        })
+        
+    for msg in messages:
+        if msg["role"] in ("user", "assistant"):
+            history.append({"role": msg["role"], "content": msg["content"]})
+            
+    # Trigger background distillation if we have exactly 20 messages and no recent summary
+    # (Simplified check: if we retrieved 20, maybe it's time to summarize)
+    if len(messages) >= 20:
+        from artimis.engine.task_runner import run_task_background
+        from artimis.engine.intelligence import distill_session_context
+        # We can fire and forget a distillation task
+        run_task_background(lambda: distill_session_context(session_id))
+            
+    return history
+
+
 @app.post("/api/sessions/{session_id}/messages")
 async def send_message(session_id: str, req: SendMessageRequest):
     """
@@ -242,13 +273,8 @@ async def send_message(session_id: str, req: SendMessageRequest):
     # Save user message
     db.add_message(session_id, "user", req.content)
 
-    # Build conversation history from previous messages
-    messages = db.get_messages(session_id, limit=50)
-    history = []
-    for msg in messages:
-        if msg["role"] in ("user", "assistant"):
-            entry = {"role": msg["role"], "content": msg["content"]}
-            history.append(entry)
+    # Build history
+    history = _build_context_history(session_id, session)
 
     # Run the Artimis agent
     from artimis.engine.agent import run_agent
@@ -298,11 +324,7 @@ async def agent_endpoint(req: AgentRequest):
     db.add_message(session_id, "user", req.message)
 
     # Build history
-    messages = db.get_messages(session_id, limit=50)
-    history = []
-    for msg in messages:
-        if msg["role"] in ("user", "assistant"):
-            history.append({"role": msg["role"], "content": msg["content"]})
+    history = _build_context_history(session_id, session)
 
     result = run_agent(
         user_message=req.message,
@@ -351,11 +373,10 @@ async def agent_stream_endpoint(req: AgentRequest):
 
         db.add_message(session_id, "user", req.message)
 
-        messages = db.get_messages(session_id, limit=50)
-        history = []
-        for msg in messages:
-            if msg["role"] in ("user", "assistant"):
-                history.append({"role": msg["role"], "content": msg["content"]})
+        history = _build_context_history(session_id, session)
+
+        full_response = []
+        tool_calls = []
 
         try:
             for sse_chunk in run_agent_streaming(

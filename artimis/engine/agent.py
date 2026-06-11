@@ -125,6 +125,16 @@ def run_agent(
     # Inject self-prompting reminder — detailed rules are in the system prompt
     system_content += "\n\nFollow the SELF-PROMPTING BEHAVIOR rules in your system prompt above.\n"
 
+    # Autonomous pattern surfacing
+    if session_id:
+        try:
+            from artimis.engine.curiosity import check_patterns
+            curiosity_note = check_patterns(session_id, user_message)
+            if curiosity_note:
+                system_content += f"\n\n## OBSERVATIONS FOR THIS TURN\n{curiosity_note}\n(Weave these naturally into your response if appropriate.)\n"
+        except Exception:
+            pass
+
     # Inject curiosity-driven session startup context
     if session_id and (not conversation_history or len(conversation_history) <= 1):
         try:
@@ -330,15 +340,7 @@ def run_agent(
             except Exception:
                 break
 
-        # After retries, run curiosity engine to surface cross-session patterns
-        try:
-            from artimis.engine.curiosity import check_patterns
-            curiosity_note = check_patterns(session_id, user_message)
-            if curiosity_note:
-                best_response += f"\n\n{curiosity_note}"
-                intelligence_notes.append("[curiosity] surfaced cross-session pattern")
-        except Exception:
-            pass
+        # (Curiosity check removed here — now runs pre-generation via system prompt)
 
         # Auto-experiment trigger: if critique score stayed below threshold,
         # create a harness improvement experiment
@@ -436,6 +438,16 @@ You are NOT a passive assistant. At the end of every response, ask yourself:
 - Is there a pattern across previous sessions I should flag?
 - Is there a skill or memory relevant to this that I haven't mentioned?
 If yes, add a brief note. Be proactive, not pushy. One insight per response maximum."""
+
+    # Autonomous pattern surfacing
+    if session_id:
+        try:
+            from artimis.engine.curiosity import check_patterns
+            curiosity_note = check_patterns(session_id, user_message)
+            if curiosity_note:
+                system_content += f"\n\n## OBSERVATIONS FOR THIS TURN\n{curiosity_note}\n(Weave these naturally into your response if appropriate.)\n"
+        except Exception:
+            pass
 
     messages.append({"role": "system", "content": system_content})
     if conversation_history:
@@ -540,16 +552,7 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
         intelligence_notes = []
 
         # ═══ CURIOSITY ENGINE (parity with run_agent) ═══
-        try:
-            from artimis.engine.curiosity import check_patterns
-            curiosity_note = check_patterns(session_id, user_message)
-            if curiosity_note:
-                curiosity_payload = f"\n\n{curiosity_note}"
-                final_text += curiosity_payload
-                yield f"data: {json.dumps({'type': 'token', 'content': curiosity_payload})}\n\n"
-                intelligence_notes.append("[curiosity] surfaced cross-session pattern")
-        except Exception:
-            pass
+        # (Curiosity check removed here — now runs pre-generation via system prompt)
 
         # ═══ FORMAT CHECK (parity with run_agent) ═══
         try:

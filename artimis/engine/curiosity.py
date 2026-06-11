@@ -22,8 +22,8 @@ logger = logging.getLogger("artimis.curiosity")
 
 def check_patterns(session_id: Optional[str] = None, current_message: str = "") -> Optional[str]:
     """
-    Lightweight check that runs after every agent response.
-    Returns a curiosity note to append to the response, or None if nothing to surface.
+    Lightweight check that runs before the agent response.
+    Returns a string of observations to inject into the system prompt, or None.
     
     Designed to be fast — no LLM calls, only DB queries.
     """
@@ -52,8 +52,8 @@ def check_patterns(session_id: Optional[str] = None, current_message: str = "") 
     if not notes:
         return None
     
-    # Format as an unobtrusive note
-    return "\n\n---\n*While I have you — " + " ".join(notes) + "*"
+    # Return as a system-friendly list of facts
+    return " ".join(notes)
 
 
 def _check_abandoned_tasks() -> Optional[str]:

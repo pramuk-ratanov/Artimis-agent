@@ -387,15 +387,15 @@ def _quick_critique(user_message: str, output: str) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════
-# AUTO-MEMORY: Learn from critique
+# AUTO-MEMORY: Learn from critique (Correction-to-Skill Pipeline)
 # ═══════════════════════════════════════════════════════════════
 
 def learn_from_critique(critique: dict, user_message: str, session_id: Optional[str] = None):
     """
-    Save critique findings as persistent memories so the agent improves.
-    Tracks recurring issues across sessions and auto-pins patterns.
-    
-    Only saves if there are actual issues to learn from — not on clean passes.
+    Correction-to-Skill pipeline.
+    When critique fires (score < 6 or clear issues), distill the lesson into a skill entry.
+    'When responding about X, always include Y.'
+    Next session, that skill auto-injects.
     """
     if not critique:
         return
@@ -404,60 +404,97 @@ def learn_from_critique(critique: dict, user_message: str, session_id: Optional[
     if not issues:
         return
     
-    score = critique.get("overall_score", 0)
-    # Only save learnings when there's something meaningful to learn
+    score = critique.get("overall_score", 10)
+    # Only synthesize a skill if there's a significant failure (< 7)
     if score >= 7 and len(issues) <= 1:
         return
     
+    from artimis.engine.agent import _get_client
+    from artimis.db.schema import get_db, generate_id
+    from artimis.engine.brain import create_skill, SKILLS_DIR
+    import os
+
     try:
-        from artimis.db.manager import create_memory, list_memories
-        import json
+        # Ask LLM to synthesize a generalized rule from the critique issues
+        client = _get_client()
+        prompt = (
+            "Analyze these critique issues from a recent conversation and formulate a generalized rule for the AI agent.\n"
+            f"User's request context: {user_message[:300]}\n"
+            f"Critique Issues: {json.dumps(issues, indent=2)}\n\n"
+            "Formulate a clear, concise instruction in the format: 'When [condition], always [action].'\n"
+            "Return JSON only:\n"
+            "{\n"
+            "  \"topic\": \"short-topic-name-like-coding-or-writing\",\n"
+            "  \"rule\": \"When responding about X, always include Y.\"\n"
+            "}"
+        )
+        response = client.chat.completions.create(
+            model="deepseek-v4-pro",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200,
+        )
+        content = response.choices[0].message.content or "{}"
+        content = content.strip()
+        if content.startswith("```"):
+            lines = content.split("\\n")
+            content = "\\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
         
-        for issue in issues:
-            if isinstance(issue, dict):
-                issue_type = issue.get("type", "general")
-                description = issue.get("description", str(issue))
-                fix = issue.get("fix", "")
-            else:
-                issue_type = "general"
-                description = str(issue)
-                fix = ""
+        try:
+            result = json.loads(content)
+        except json.JSONDecodeError:
+            result = {}
             
-            # Build a concise learning memory
-            memory_content = (
-                f"Critique finding [{issue_type}]: {description}. "
-                f"Fix: {fix}. "
-                f"Context: {user_message[:150]}"
-            )
-            memory_content = memory_content[:500]  # Cap at 500 chars
+        topic = result.get("topic", "general")
+        rule = result.get("rule", "")
+        
+        if not rule:
+            return
             
-            # Check if this type of issue already exists (avoid duplicates)
-            existing = list_memories(tag=issue_type)
-            duplicate = any(
-                description[:50] in (m.get("content", "") or "") 
-                for m in existing
-            )
-            
-            if not duplicate:
-                create_memory(
-                    content=memory_content,
-                    tags=["learning", "critique", "auto", issue_type],
-                    source="auto",
+        # We will maintain a single 'correction-ledger' skill that accumulates these rules.
+        # It's better than creating 100 tiny skills.
+        skill_name = "correction-ledger"
+        
+        conn = get_db()
+        row = conn.execute("SELECT content FROM skills WHERE name = ?", (skill_name,)).fetchone()
+        
+        if row:
+            # Update existing ledger
+            current_content = row["content"]
+            # Avoid exact duplicates
+            if rule not in current_content:
+                new_content = current_content + f"\\n- **{topic.capitalize()}**: {rule}"
+                conn.execute(
+                    "UPDATE skills SET content = ?, version = version + 1 WHERE name = ?",
+                    (new_content, skill_name)
                 )
-                logger.info(f"Auto-memory saved: {issue_type} — {description[:80]}")
+                conn.commit()
+                # Update file
+                skill_path = os.path.join(SKILLS_DIR, skill_name, "SKILL.md")
+                if os.path.exists(skill_path):
+                    with open(skill_path, "w") as f:
+                        f.write(new_content)
+                logger.info(f"Appended rule to correction-ledger: {rule[:80]}")
+        else:
+            # Create new ledger
+            initial_content = (
+                "# Correction Ledger\\n\\n"
+                "This skill contains generalized rules learned from past mistakes and critiques. "
+                "Always adhere to these rules when applicable:\\n\\n"
+                f"- **{topic.capitalize()}**: {rule}"
+            )
+            create_skill(
+                name=skill_name,
+                content=initial_content,
+                tags=["learning", "core", "rules"],
+                auto_updated=True
+            )
+            logger.info(f"Created correction-ledger skill with rule: {rule[:80]}")
             
-            # If this issue type appears 3+ times, pin it as a recurring pattern
-            if len(existing) >= 2:
-                for mem in existing:
-                    try:
-                        from artimis.db.manager import update_memory
-                        update_memory(mem["id"], pinned=True)
-                    except Exception:
-                        pass
-                logger.info(f"Pinned recurring issue pattern: {issue_type}")
-    
+        conn.close()
+
     except Exception as e:
-        logger.warning(f"Auto-memory learning failed: {e}")
+        logger.warning(f"Correction-to-skill pipeline failed: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -505,6 +542,63 @@ def auto_name_session(session_id: str, first_user_message: str,
 # ═══════════════════════════════════════════════════════════════
 # CONTEXT INHERITANCE
 # ═══════════════════════════════════════════════════════════════
+
+def distill_session_context(session_id: str):
+    """
+    Summarizes the older part of a long session to preserve context
+    without blowing up the prompt budget. Saves to the 'summary' column.
+    """
+    from artimis.db.manager import get_messages
+    from artimis.db.schema import get_db
+    from artimis.engine.agent import _get_client
+    
+    conn = get_db()
+    session = conn.execute("SELECT summary FROM sessions WHERE id = ?", (session_id,)).fetchone()
+    if not session:
+        conn.close()
+        return
+        
+    # Get all messages chronologically
+    all_msgs = get_messages(session_id, limit=1000, desc=False)
+    conn.close()
+    
+    if len(all_msgs) < 20:
+        return
+        
+    # We want to summarize everything except the last 10 messages
+    to_summarize = all_msgs[:-10]
+    
+    text_to_summarize = "\\n".join([f"{m['role'].upper()}: {m['content'][:200]}" for m in to_summarize])
+    existing_summary = session["summary"] or ""
+    
+    try:
+        client = _get_client()
+        prompt = (
+            "Summarize the following conversation history into a concise list of key facts, "
+            "established decisions, user constraints, and completed tasks. "
+            "This will serve as the persistent memory for the ongoing conversation.\\n\\n"
+        )
+        if existing_summary:
+            prompt += f"Previous summary:\\n{existing_summary}\\n\\n"
+            
+        prompt += f"New messages to incorporate:\\n{text_to_summarize}\\n\\n"
+        prompt += "Return ONLY the compressed summary in bullet points, without introductory text."
+        
+        response = client.chat.completions.create(
+            model="deepseek-v4-pro",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=300,
+        )
+        new_summary = (response.choices[0].message.content or "").strip()
+        
+        conn = get_db()
+        conn.execute("UPDATE sessions SET summary = ? WHERE id = ?", (new_summary, session_id))
+        conn.commit()
+        conn.close()
+        
+    except Exception as e:
+        logger.warning(f"Session distillation failed: {e}")
 
 def get_session_orientation(session_id: str, user_message: str) -> str:
     """

@@ -57,6 +57,7 @@ CREATE TABLE IF NOT EXISTS memories (
     use_count       INTEGER NOT NULL DEFAULT 0,
     source          TEXT NOT NULL DEFAULT 'auto' CHECK(source IN ('auto', 'manual')),
     active          INTEGER NOT NULL DEFAULT 0 CHECK(active IN (0, 1)),
+    embedding       TEXT,  -- JSON array of floats for semantic search
     created_at      TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -249,6 +250,23 @@ def init_db():
     """Initialize the database. Safe to call multiple times — only creates if needed."""
     conn = get_db()
     conn.executescript(SCHEMA)
+    
+    # Run migrations
+    try:
+        conn.execute("ALTER TABLE memories ADD COLUMN embedding TEXT")
+    except Exception:
+        pass # Column likely already exists
+        
+    try:
+        conn.execute("ALTER TABLE sessions ADD COLUMN parent_session_id TEXT")
+    except Exception:
+        pass
+        
+    try:
+        conn.execute("ALTER TABLE sessions ADD COLUMN summary TEXT")
+    except Exception:
+        pass
+        
     conn.commit()
     conn.close()
 

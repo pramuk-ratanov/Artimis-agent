@@ -24,23 +24,38 @@ from artimis.db.schema import get_db, generate_id, now
 
 # ─── Memory Relevance Engine ───────────────────────────────
 
-def score_memory_relevance(memory: dict, query: str) -> float:
+def score_memory_relevance(memory: dict, query: str, query_emb: Optional[list[float]] = None) -> float:
     """Score how relevant a memory is to the current query. 0.0 to 1.0."""
     content = memory.get("content", "").lower()
     query_lower = query.lower()
 
     score = 0.0
 
-    # Exact phrase match
+    # Semantic similarity (fastembed)
+    if query_emb:
+        try:
+            emb_str = memory.get("embedding")
+            if emb_str:
+                import json
+                from artimis.engine.embeddings import cosine_similarity
+                mem_emb = json.loads(emb_str)
+                sim = cosine_similarity(query_emb, mem_emb)
+                # Boost score heavily for semantic similarity (>0.5 threshold)
+                if sim > 0.5:
+                    score += sim * 0.8
+        except Exception:
+            pass
+
+    # Exact phrase match fallback
     if query_lower in content:
-        score += 0.4
+        score += 0.3
 
     # Word overlap
     query_words = set(query_lower.split())
     content_words = set(content.split())
     overlap = query_words & content_words
     if overlap:
-        score += 0.3 * (len(overlap) / max(len(query_words), 1))
+        score += 0.2 * (len(overlap) / max(len(query_words), 1))
 
     # Pinned bonus
     if memory.get("pinned"):
@@ -436,6 +451,14 @@ def build_brain_context(query: str) -> str:
     Always includes pinned memories. Adds scored memories and skills up to budget.
     """
     parts = []
+    
+    # Tier 0: Correction Ledger (always inject learned rules)
+    from artimis.db.schema import get_db
+    conn = get_db()
+    ledger_row = conn.execute("SELECT content FROM skills WHERE name = 'correction-ledger'").fetchone()
+    conn.close()
+    if ledger_row:
+        parts.append(f"=== LEARNED RULES ===\\n{ledger_row['content']}\\n=====================\\n")
 
     # Tier 1: Pinned memories (always included, no cap)
     pinned = list_memories(pinned=True)
@@ -446,20 +469,25 @@ def build_brain_context(query: str) -> str:
     all_memories = list_memories()
     non_pinned = [m for m in all_memories if m["id"] not in {p["id"] for p in pinned}]
 
+    from artimis.engine.embeddings import get_embedding
+    query_emb = get_embedding(query)
+
     scored = []
     for m in non_pinned:
-        rel = score_memory_relevance(m, query)
+        rel = score_memory_relevance(m, query, query_emb)
         if rel > 0.05:
             scored.append((rel, m))
 
     scored.sort(key=lambda x: x[0], reverse=True)
     relevant_mems = pinned + [m for _, m in scored[:15]]
-    mem_text = format_memories_for_prompt(relevant_mems)
+    mem_text = "\\n".join(parts) + "\\n" + format_memories_for_prompt(relevant_mems)
 
     # Tier 3: Skills (only if budget allows)
     remaining_budget = MAX_CONTEXT_CHARS - len(mem_text)
     if remaining_budget > 500:
         skills = get_relevant_skills(query, max_results=3)
+        # Exclude correction-ledger since we already injected it
+        skills = [s for s in skills if s["name"] != "correction-ledger"]
         if skills:
             skill_text = format_skills_for_prompt(skills)
             if len(skill_text) <= remaining_budget:
