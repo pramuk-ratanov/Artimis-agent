@@ -122,29 +122,8 @@ def run_agent(
         except Exception:
             pass  # Brain injection is best-effort
 
-    # Inject self-prompting behavior — the agent surfaces its own insights
-    system_content += """
-
-## SELF-PROMPTING BEHAVIOR
-
-You are NOT a passive assistant that waits to be asked. You have accumulated experience across sessions — memories, skills, patterns, learnings. Use them.
-
-At the end of every response, ask yourself:
-- Is there a pattern across previous sessions I should flag?
-- Is there a skill or memory relevant to this that I haven't mentioned?
-- Is there a task the user abandoned that I should surface?
-- Did I learn something from a past mistake that applies here?
-
-If yes, add a brief note: "By the way — [specific insight from your accumulated experience]."
-
-Examples of good self-prompting:
-- "By the way — you've asked about freight logistics pricing 4 times this week. Want me to create a reusable pricing comparison template?"
-- "I notice this relates to the competitor analysis you abandoned last Tuesday. Should I pick that up?"
-- "I learned from a past mistake that I should cite sources on claims like this. Here's what I found..."
-
-You also have curiosity-driven pattern detection that runs automatically. When it surfaces something, integrate it naturally rather than as a robotic system message.
-
-Be proactive, not pushy. One insight per response maximum. If nothing relevant comes to mind, stay silent."""
+    # Inject self-prompting reminder — detailed rules are in the system prompt
+    system_content += "\n\nFollow the SELF-PROMPTING BEHAVIOR rules in your system prompt above.\n"
 
     # Inject curiosity-driven session startup context
     if session_id and (not conversation_history or len(conversation_history) <= 1):
@@ -385,6 +364,20 @@ Be proactive, not pushy. One insight per response maximum. If nothing relevant c
             except Exception:
                 pass
 
+        # Record critique score for trend tracking
+        if session_id:
+            try:
+                from artimis.db.schema import get_db, generate_id
+                conn = get_db()
+                conn.execute(
+                    "INSERT INTO critique_history (id, session_id, score) VALUES (?, ?, ?)",
+                    (generate_id(), session_id, best_score)
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+
         return {
             "response": best_response,
             "tool_calls_made": tool_calls_made,
@@ -557,6 +550,20 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                 pass
         except Exception:
             pass
+
+        # Record critique score for trend tracking
+        if critique_score is not None and session_id:
+            try:
+                from artimis.db.schema import get_db, generate_id
+                conn = get_db()
+                conn.execute(
+                    "INSERT INTO critique_history (id, session_id, score) VALUES (?, ?, ?)",
+                    (generate_id(), session_id, critique_score)
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
 
         # Auto-experiment trigger: low critique score → create harness experiment
         if critique_score is not None and critique_score < 6 and session_id:
