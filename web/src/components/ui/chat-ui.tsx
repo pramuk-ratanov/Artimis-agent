@@ -28,7 +28,14 @@ interface ChatUIProps {
 }
 
 function renderMarkdown(content: string): string {
-  return content
+  // If content contains unmatched code blocks (streaming), artificially close them for rendering
+  let processedContent = content;
+  const backtickCount = (content.match(/```/g) || []).length;
+  if (backtickCount % 2 !== 0) {
+    processedContent += "\n```";
+  }
+
+  return processedContent
     .replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
       const langLabel = lang ? `<span class="code-lang">${lang}</span>` : ""
       return `<div class="code-block"><div class="code-header">${langLabel}<button class="code-copy-btn" data-code="${encodeURIComponent(code.trim())}">Copy</button></div><pre><code>${code.trim()}</code></pre></div>`
@@ -51,7 +58,18 @@ function renderMarkdown(content: string): string {
     .replace(/^(?!<[a-z]|$)(.+)$/gm, '<p>$1</p>')
 }
 
-/** Three-dot typing indicator */
+function sanitizeHtml(html: string): string {
+  // Strip raw HTML tags that appear outside of fenced code blocks.
+  // This prevents the LLM leaking design code from being rendered as live DOM.
+  const parts = html.split(/(```[\s\S]*?```)/g)
+  return parts.map((part, i) => {
+    if (i % 2 === 1) return part // inside a code block — pass through intact
+    // Outside code blocks: escape < > so the browser shows them as text, not DOM
+    return part.replace(/<(?!\/?(?:strong|em|h[1-6]|p|ul|li|ol|blockquote|hr|br|tr|td|th|table|code|pre|div|span)[>\s])/gi, '&lt;')
+  }).join('')
+}
+
+
 function TypingDots() {
   return (
     <div className="flex items-center gap-1.5 py-2 animate-fade-up">
@@ -292,10 +310,10 @@ export function ChatUI({
                                         {msg.content}<span className="typing-cursor" />
                                       </p>
                                     ) : (
-                                      /* Completed: render full markdown */
+                                      /* Completed: render full markdown, sanitized */
                                       <div
                                         className="msg-content text-body text-ink-primary font-share leading-relaxed"
-                                        dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(renderMarkdown(msg.content)) }}
                                       />
                                     )}
                                   </div>

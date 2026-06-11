@@ -234,14 +234,33 @@ function App() {
 
         if (value.type === "tool") {
           setSignalState("thinking")
-          if (value.name === "canvas_update" && value.args) {
-            setCanvasState({ isOpen: true, title: value.args.title || "Canvas", content: value.args.content || "" })
+          // canvas_update tool — open canvas with provided content immediately
+          if (value.name === "canvas_update" && value.args?.content) {
+            setCanvasState({ isOpen: true, title: value.args.title || "Canvas", content: value.args.content })
+          }
+          // design_audit tool — keep canvas open showing current code
+          if (value.name === "design_audit") {
+            setCanvasState(s => ({ isOpen: true, title: s.title || "Design Audit", content: s.content }))
           }
         } else if (value.type === "start") {
           setSignalState("streaming")
           if (value.session_id) sessionId = value.session_id
         } else if (value.type === "token") {
           responseText += value.content || ""
+          
+          // Auto-open Canvas the moment agent starts writing a UI code block
+          const hasUiCode = responseText.includes("```tsx") || responseText.includes("```html") || responseText.includes("```jsx")
+          if (!canvasState.isOpen && hasUiCode) {
+            setCanvasState({
+              isOpen: true,
+              title: "Live Preview",
+              content: responseText
+            })
+          } else if (canvasState.isOpen) {
+            // Continuously feed live content to canvas during streaming
+            setCanvasState(s => ({ ...s, content: responseText }))
+          }
+          
           setChats(p => p.map(c => c.id === activeChatId ? {
             ...c,
             messages: c.messages.map(m => m.id === amId ? { ...m, content: responseText } : m),

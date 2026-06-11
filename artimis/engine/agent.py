@@ -504,6 +504,7 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
         yield f"data: {json.dumps({'type': 'start', 'tool_calls_made': tool_calls_made, 'model': model_name})}\n\n"
 
         streamed_parts = []
+        pending_tool_chunks: list = []  # collects streaming tool call chunks (DSML path)
         try:
             stream = client.chat.completions.create(
                 model=model_name,
@@ -514,10 +515,52 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
             )
 
             for chunk in stream:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    content = chunk.choices[0].delta.content
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta
+
+                # ── Intercept DSML / inline tool calls during streaming ──
+                # Some models (DeepSeek) emit tool calls as streaming delta.tool_calls
+                # instead of finishing the response first. Capture them here so they
+                # never leak into the chat bubble as raw markup.
+                if delta.tool_calls:
+                    for tc_chunk in delta.tool_calls:
+                        idx = tc_chunk.index
+                        if idx >= len(pending_tool_chunks):
+                            pending_tool_chunks.append({"id": "", "name": "", "args_buf": ""})
+                        if tc_chunk.id:
+                            pending_tool_chunks[idx]["id"] = tc_chunk.id
+                        if tc_chunk.function:
+                            if tc_chunk.function.name:
+                                pending_tool_chunks[idx]["name"] += tc_chunk.function.name
+                            if tc_chunk.function.arguments:
+                                pending_tool_chunks[idx]["args_buf"] += tc_chunk.function.arguments
+                    continue  # do NOT emit this as a text token
+
+                if delta.content:
+                    content = delta.content
+                    # ── Filter residual DSML tags from plain-text tokens ──
+                    # Occurs when model outputs tool-call XML without using the API tool mechanism
+                    import re as _re
+                    if _re.search(r'<\|[\|]?\s*(DSML|tool_calls|invoke|parameter)', content):
+                        continue  # drop this token entirely
                     streamed_parts.append(content)
                     yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+
+            # ── If streaming emitted tool call chunks, execute them now ──
+            if pending_tool_chunks:
+                for ptc in pending_tool_chunks:
+                    tool_name = ptc["name"]
+                    try:
+                        tool_args = json.loads(ptc["args_buf"]) if ptc["args_buf"] else {}
+                    except json.JSONDecodeError:
+                        tool_args = {}
+                    # Emit the tool event so frontend can open the canvas
+                    yield f"data: {json.dumps({'type': 'tool', 'name': tool_name, 'args': tool_args})}\n\n"
+                    result = execute_tool(tool_name, tool_args)
+                    tool_calls_made += 1
+                    messages.append({"role": "tool", "tool_call_id": ptc["id"] or "inline", "content": result})
+
 
         except Exception as e:
             logger.error(f"Streaming failed: {e}")

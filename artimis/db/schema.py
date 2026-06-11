@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS skills (
     content         TEXT NOT NULL,
     file_path       TEXT,
     tags            TEXT NOT NULL DEFAULT '[]',
+    type            TEXT NOT NULL DEFAULT 'logic',
     use_count       INTEGER NOT NULL DEFAULT 0,
     pinned          INTEGER NOT NULL DEFAULT 0 CHECK(pinned IN (0, 1)),
     auto_updated    INTEGER NOT NULL DEFAULT 0 CHECK(auto_updated IN (0, 1)),

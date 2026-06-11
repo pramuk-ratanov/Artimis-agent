@@ -182,6 +182,20 @@ TOOL_SCHEMAS = [
             }
         }
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "design_audit",
+            "description": "Run the Impeccable design linter against frontend code (React, HTML, CSS). Returns detailed UI/UX critique and anti-slop rules broken.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "code_content": {"type": "string", "description": "The actual UI code to audit"}
+                },
+                "required": ["code_content"]
+            }
+        }
+    },
 ]
 
 
@@ -508,6 +522,38 @@ def handle_canvas_update(args: dict) -> str:
     return safe_result(True, data={"updated": True, "title": args["title"], "content_length": len(args["content"])})
 
 
+def handle_design_audit(args: dict) -> str:
+    _validate_required(args, ["code_content"], "design_audit")
+    import tempfile
+    import subprocess
+    
+    with tempfile.NamedTemporaryFile("w", suffix=".tsx", delete=False) as f:
+        f.write(args["code_content"])
+        temp_path = f.name
+        
+    try:
+        # Run npx impeccable detect --json
+        res = subprocess.run(
+            ["npx", "--yes", "impeccable", "detect", "--json", temp_path],
+            capture_output=True, text=True, timeout=15
+        )
+        os.remove(temp_path)
+        
+        try:
+            audit_json = json.loads(res.stdout)
+            return safe_result(True, data=audit_json)
+        except json.JSONDecodeError:
+            # If it failed to output valid JSON for some reason, return the raw stdout/stderr
+            return safe_result(True, data={"output": res.stdout, "errors": res.stderr})
+    except subprocess.TimeoutExpired:
+        os.remove(temp_path)
+        return safe_result(False, error="Design audit timed out after 15 seconds.")
+    except Exception as e:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        return safe_result(False, error=f"Design audit failed: {e}")
+
+
 # ─── Tool Registry ──────────────────────────────────────────
 
 TOOL_HANDLERS = {
@@ -522,6 +568,7 @@ TOOL_HANDLERS = {
     "harness_snapshot": handle_harness_snapshot,
     "harness_experiment": handle_harness_experiment,
     "canvas_update": handle_canvas_update,
+    "design_audit": handle_design_audit,
 }
 
 

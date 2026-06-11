@@ -12,19 +12,17 @@ import { useEffect, useRef, useState } from "react"
 import * as api from "@/lib/api"
 import type { GraphNode, GraphEdge } from "@/lib/api"
 
-// Topic → OKLCH color. Cool blues for system/AI/infra, warm ember for the
-// human/business side, neutral for general.
+// Topic → Pastel hex colors inspired by Google/DeepMind high-tech graphing.
 const TOPIC_COLOR: Record<string, string> = {
-  coding: "oklch(0.62 0.10 230)",   // signal blue
-  ai: "oklch(0.70 0.09 200)",       // cyan-blue
-  design: "oklch(0.68 0.12 300)",   // violet
-  business: "oklch(0.68 0.12 60)",  // ember (warm)
-  infra: "oklch(0.60 0.08 160)",    // teal-green
-  general: "oklch(0.55 0.01 60)",   // warm grey
+  coding: "#93C5FD",   // pastel blue
+  ai: "#C4B5FD",       // pastel purple
+  design: "#FCA5A5",   // pastel coral
+  business: "#FCD34D", // pastel yellow
+  infra: "#86EFAC",    // pastel mint
+  general: "#E2E8F0",  // pastel grey
 }
 
-const EMBER = "oklch(0.68 0.13 60)"
-const EMBER_FAINT = "oklch(0.50 0.06 60)"
+const EMBER = "#FCD34D" // glowing warm accent
 
 interface PNode extends GraphNode {
   x: number
@@ -38,7 +36,9 @@ export function ConversationConstellation() {
   const [graph, setGraph] = useState<{ nodes: GraphNode[]; edges: GraphEdge[] }>({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(true)
   const [hover, setHover] = useState<string | null>(null)
+  const [selected, setSelected] = useState<string | null>(null)
   const hoverRef = useRef<string | null>(null)
+  const selectedRef = useRef<string | null>(null)
   const nodesRef = useRef<PNode[]>([])
   const rafRef = useRef<number>(0)
 
@@ -49,6 +49,7 @@ export function ConversationConstellation() {
   }, [])
 
   useEffect(() => { hoverRef.current = hover }, [hover])
+  useEffect(() => { selectedRef.current = selected }, [selected])
 
   // Initialize node positions + run a brief force-directed settle, then animate.
   useEffect(() => {
@@ -102,8 +103,17 @@ export function ConversationConstellation() {
       if (found !== hoverRef.current) setHover(found)
     }
     const onLeave = () => setHover(null)
+    const onClick = () => {
+      if (hoverRef.current) {
+        setSelected(prev => prev === hoverRef.current ? null : hoverRef.current)
+      } else {
+        setSelected(null)
+      }
+    }
+    
     canvas.addEventListener("mousemove", onMove)
     canvas.addEventListener("mouseleave", onLeave)
+    canvas.addEventListener("click", onClick)
 
     let t = 0
     const start = performance.now()
@@ -148,66 +158,95 @@ export function ConversationConstellation() {
       // ── Render ──
       ctx.clearRect(0, 0, W, H)
       const hv = hoverRef.current
-      const hvSet = hv ? neighbors.get(hv) : null
+      const sel = selectedRef.current
+      const activeNode = sel || hv
+      const activeSet = activeNode ? neighbors.get(activeNode) : null
 
       // Edges + sweeping ember pulse
       graph.edges.forEach((e, idx) => {
         const a = byId.get(e.source), b = byId.get(e.target)
         if (!a || !b) return
-        const active = !hv || e.source === hv || e.target === hv
-        const dimEdge = hv && e.source !== hv && e.target !== hv
         
-        // Restore Faint Static Edge
-        ctx.strokeStyle = "oklch(60% 0.05 240)"
-        ctx.globalAlpha = dimEdge ? 0.02 : 0.08
-        ctx.lineWidth = 1 + e.weight
+        const isConnectedToActive = !activeNode || e.source === activeNode || e.target === activeNode
+        const dimEdge = activeNode && !isConnectedToActive
+        
+        // Faint Static Edge (very thin)
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)" // clean white/grey edge like DeepMind
+        ctx.globalAlpha = dimEdge ? 0.01 : (0.1 + e.weight * 0.1)
+        ctx.lineWidth = 0.4 + e.weight * 0.3 // Ultra thin wires
         ctx.beginPath()
         ctx.moveTo(a.x, a.y)
         ctx.lineTo(b.x, b.y)
         ctx.stroke()
         ctx.globalAlpha = 1
 
-        // Ember pulse: a bright dot sweeping along the edge
-        if (active) {
-          const speed = 0.35 + e.weight * 0.4
-          const phase = (t * speed + (idx * 0.137)) % 1
-          const px = a.x + (b.x - a.x) * phase
-          const py = a.y + (b.y - a.y) * phase
-          const glow = hv ? 1 : 0.6
-          const pulseSize = hv ? 6 + e.weight * 2 : 4 + e.weight * 2
+        // Ember pulse: fast firing neural line
+        if (isConnectedToActive) {
+          const speed = 0.5 + e.weight * 0.4 // Faster firing
+          const pulseLength = 0.4 
+          const cycleLength = 2.5 // Creates the pause/delay between fires
           
-          // Use simple arc + opacity instead of a new gradient every frame to fix GC stutter
-          ctx.fillStyle = EMBER
-          ctx.globalAlpha = glow * 0.8
-          ctx.beginPath(); ctx.arc(px, py, pulseSize, 0, Math.PI * 2); ctx.fill()
+          const localPhase = (t * speed + (idx * 0.137)) % cycleLength
           
-          // Hot core
-          ctx.globalAlpha = glow
-          ctx.fillStyle = "oklch(0.95 0.05 60)"
-          ctx.beginPath(); ctx.arc(px, py, pulseSize * 0.4, 0, Math.PI * 2); ctx.fill()
-          ctx.globalAlpha = 1
+          if (localPhase < 1 + pulseLength) {
+            const phase = localPhase
+            const pStart = Math.max(0, phase - pulseLength)
+            const pEnd = Math.min(1, phase)
+            
+            if (pStart < pEnd) {
+              const x1 = a.x + (b.x - a.x) * pStart
+              const y1 = a.y + (b.y - a.y) * pStart
+              const x2 = a.x + (b.x - a.x) * pEnd
+              const y2 = a.y + (b.y - a.y) * pEnd
+              
+              // Linear gradient for a smooth ethereal beam (transparent -> core -> transparent)
+              const grad = ctx.createLinearGradient(x1, y1, x2, y2)
+              grad.addColorStop(0, "transparent")
+              grad.addColorStop(0.5, TOPIC_COLOR[a.topic] || EMBER) // Firing inherits source node color
+              grad.addColorStop(1, "transparent")
+              
+              ctx.beginPath()
+              ctx.moveTo(x1, y1)
+              ctx.lineTo(x2, y2)
+              ctx.strokeStyle = grad
+              ctx.lineWidth = activeNode ? 1.5 + e.weight : 1.0 + e.weight
+              ctx.lineCap = "round"
+              
+              // Native canvas shadow for neon glow
+              ctx.shadowColor = TOPIC_COLOR[a.topic] || EMBER
+              ctx.shadowBlur = 8
+              ctx.stroke()
+              
+              ctx.shadowBlur = 0
+              ctx.shadowColor = "transparent"
+            }
+          }
         }
       })
 
       // Nodes
       pnodes.forEach(n => {
-        const r = 3 + n.size * 7
-        const isHover = n.id === hv
-        const isNeighbor = hvSet?.has(n.id)
-        const dim = hv && !isHover && !isNeighbor
+        // Minimalist nodes: small, solid dots
+        const r = 1.5 + n.size * 3 // Scaled down drastically for that dense data-viz look
+        const isHover = n.id === activeNode
+        const isNeighbor = activeSet?.has(n.id)
+        const dim = activeNode && !isHover && !isNeighbor
         const color = TOPIC_COLOR[n.topic] || TOPIC_COLOR.general
 
-        // soft glow
-        ctx.globalAlpha = dim ? 0.15 : 1
-        const halo = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, r * 3)
-        halo.addColorStop(0, isHover ? EMBER_FAINT : color)
-        halo.addColorStop(1, "oklch(0 0 0 / 0)")
-        ctx.fillStyle = halo
-        ctx.beginPath(); ctx.arc(n.x, n.y, r * 3, 0, Math.PI * 2); ctx.fill()
-
-        // core
-        ctx.fillStyle = isHover ? EMBER : color
-        ctx.beginPath(); ctx.arc(n.x, n.y, r, 0, Math.PI * 2); ctx.fill()
+        // Nodes dim drastically if not part of the focused cluster
+        ctx.globalAlpha = dim ? 0.1 : 1
+        
+        // No massive halo. Just the crisp core circle
+        ctx.fillStyle = color
+        ctx.beginPath(); ctx.arc(n.x, n.y, isHover ? r + 1 : r, 0, Math.PI * 2); ctx.fill()
+        
+        // Subtle stroke/ring for hovered/selected nodes
+        if (isHover || (isNeighbor && sel)) {
+           ctx.strokeStyle = color
+           ctx.lineWidth = 0.5
+           ctx.beginPath(); ctx.arc(n.x, n.y, r + 4, 0, Math.PI * 2); ctx.stroke()
+        }
+        
         ctx.globalAlpha = 1
       })
 

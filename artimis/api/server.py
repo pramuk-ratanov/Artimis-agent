@@ -659,12 +659,72 @@ class CreateSkillRequest(BaseModel):
     name: str
     content: str
     tags: Optional[list[str]] = None
+    type: str = "logic"
 
+class IngestSkillRequest(BaseModel):
+    url: str
 
 @app.post("/api/skills")
 async def create_skill(req: CreateSkillRequest):
     from artimis.engine.brain import create_skill as brain_create_skill
-    return brain_create_skill(name=req.name, content=req.content, tags=req.tags)
+    return brain_create_skill(name=req.name, content=req.content, tags=req.tags, skill_type=req.type)
+
+@app.post("/api/skills/ingest")
+async def ingest_skill(req: IngestSkillRequest):
+    """Clone a GitHub repo and extract SKILL.md profiles."""
+    import tempfile
+    import subprocess
+    import os
+    import glob
+    from artimis.engine.brain import create_skill as brain_create_skill
+    
+    if not req.url.startswith("https://github.com/"):
+        raise HTTPException(400, "Only github.com URLs are supported")
+        
+    with tempfile.TemporaryDirectory() as tmpdir:
+        try:
+            subprocess.run(["git", "clone", "--depth", "1", req.url, tmpdir], check=True, capture_output=True)
+        except subprocess.CalledProcessError as e:
+            raise HTTPException(400, f"Git clone failed: {e.stderr.decode()}")
+            
+        # Find SKILL.md files
+        skill_files = []
+        for root, _, files in os.walk(tmpdir):
+            for file in files:
+                if file == "SKILL.md":
+                    skill_files.append(os.path.join(root, file))
+                    
+        if not skill_files:
+            raise HTTPException(404, "No SKILL.md files found in repository")
+            
+        ingested = []
+        for file in skill_files:
+            with open(file, 'r', encoding='utf-8') as f:
+                content = f.read()
+                
+            # Attempt to parse name from frontmatter or filename path
+            name = "ingested-skill"
+            if "name:" in content[:500]:
+                for line in content[:500].split('\\n'):
+                    if line.startswith("name:"):
+                        name = line.replace("name:", "").strip().strip('\'"')
+                        break
+            if name == "ingested-skill":
+                parts = file.replace(tmpdir, "").strip("/").split("/")
+                if len(parts) > 1:
+                    name = parts[-2] # folder name
+                else:
+                    name = req.url.split("/")[-1].replace(".git", "")
+            
+            # create_skill expects specific args, let's just pass tags=["design"] to mark them
+            try:
+                skill = brain_create_skill(name=name, content=content, tags=["design", "ingested"], skill_type="design")
+                ingested.append(skill)
+            except Exception as e:
+                pass # skip duplicates
+                
+        return {"ingested": len(ingested), "skills": ingested}
+
 
 
 @app.get("/api/skills/{skill_id}")
@@ -990,34 +1050,44 @@ async def get_statistics():
             msg_count = conn.execute(f"SELECT COUNT(*) FROM messages WHERE {pattern}", params).fetchone()[0]
             if count > 0:
                 focus_sessions[area] = {"sessions": count, "messages": msg_count}
-    # Top skills: from memories tags
-    tags_raw = db.execute("SELECT tags FROM memories WHERE tags != '[]'").fetchall()
-    tag_counts: dict = {}
-    for (tags_str,) in tags_raw:
+
+        # Top skills: from memories tags
+        tags_raw = conn.execute("SELECT tags FROM memories WHERE tags != '[]'").fetchall()
+        tag_counts: dict = {}
+        for (tags_str,) in tags_raw:
+            try:
+                for tag in json.loads(tags_str):
+                    tag_counts[tag] = tag_counts.get(tag, 0) + 1
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+        top_skills = [{"name": k, "value": v} for k, v in tag_counts.items() if v >= 2][:8]
+        if not top_skills:
+            top_skills = [{"name": "Start chatting to build stats", "value": 1}]
+
+        # Critique score trend
+        critique_trend = []
         try:
-            for tag in json.loads(tags_str):
-                tag_counts[tag] = tag_counts.get(tag, 0) + 1
-        except (json.JSONDecodeError, TypeError):
+            rows = conn.execute(
+                "SELECT date(created_at) as day, AVG(score) as avg_score, COUNT(*) as count "
+                "FROM critique_history GROUP BY day ORDER BY day DESC LIMIT 30"
+            ).fetchall()
+            critique_trend = [
+                {"day": r["day"], "avg_score": round(r["avg_score"], 2), "count": r["count"]}
+                for r in rows
+            ]
+            critique_trend.reverse()  # chronological order
+        except Exception:
             pass
 
-    top_skills = [{"name": k, "value": v} for k, v in tag_counts.items() if v >= 2][:8]
-    if not top_skills:
-        top_skills = [{"name": "Start chatting to build stats", "value": 1}]
-
-    # Critique score trend
-    critique_trend = []
-    try:
-        rows = db.execute(
-            "SELECT date(created_at) as day, AVG(score) as avg_score, COUNT(*) as count "
-            "FROM critique_history GROUP BY day ORDER BY day DESC LIMIT 30"
-        ).fetchall()
-        critique_trend = [
-            {"day": r["day"], "avg_score": round(r["avg_score"], 2), "count": r["count"]}
-            for r in rows
-        ]
-        critique_trend.reverse()  # chronological order
-    except Exception:
-        pass
+    # Calculate percentages for focus areas
+    focus_areas = []
+    if focus_sessions:
+        total_focus_msgs = sum(f["messages"] for f in focus_sessions.values())
+        for area, data in focus_sessions.items():
+            pct = round((data["messages"] / total_focus_msgs) * 100) if total_focus_msgs > 0 else 0
+            focus_areas.append({"topic": area, "sessions": data["sessions"], "messages": data["messages"], "percentage": pct})
+        focus_areas.sort(key=lambda x: x["messages"], reverse=True)
 
     return {
         "totalSessions": total_sessions,

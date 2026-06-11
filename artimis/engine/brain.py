@@ -288,26 +288,25 @@ def save_skill_to_file(name: str, content: str, version: int):
 
 
 def create_skill(name: str, content: str, tags: Optional[list] = None,
-                 auto_updated: bool = False) -> dict:
+                 auto_updated: bool = False, skill_type: str = "logic") -> dict:
     """Create a new skill in both database and filesystem."""
     from artimis.db.schema import get_db
 
     skill_id = generate_id()
     conn = get_db()
+    
+    file_path = os.path.join(SKILLS_DIR, name, "SKILL.md")
     conn.execute(
-        """INSERT INTO skills (id, name, version, content, file_path, tags, auto_updated)
-           VALUES (?, ?, 1, ?, ?, ?, ?)""",
-        (skill_id, name, content,
-         os.path.join(SKILLS_DIR, name, "SKILL.md"),
-         json.dumps(tags or []),
-         1 if auto_updated else 0)
+        """INSERT INTO skills (id, name, version, content, file_path, tags, type, auto_updated)
+           VALUES (?, ?, 1, ?, ?, ?, ?, ?)""",
+        (skill_id, name, content, file_path, json.dumps(tags or []), skill_type, 1 if auto_updated else 0)
     )
     conn.commit()
     conn.close()
 
     save_skill_to_file(name, content, 1)
-    return {"id": skill_id, "name": name, "version": 1, "content": content,
-            "tags": tags or [], "auto_updated": auto_updated}
+
+    return {"id": skill_id, "name": name, "version": 1, "tags": tags or [], "type": skill_type}
 
 
 def update_skill_content(skill_id: str, new_content: str) -> Optional[dict]:
