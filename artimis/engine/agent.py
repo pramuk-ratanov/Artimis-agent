@@ -465,6 +465,8 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                 tools=TOOL_SCHEMAS,
                 tool_choice="auto",
                 temperature=0.7,
+                max_tokens=4000,
+                timeout=60,
             )
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
@@ -510,7 +512,8 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                 model=model_name,
                 messages=messages,
                 temperature=0.7,
-                max_tokens=2000,
+                max_tokens=8000,
+                timeout=90,
                 stream=True,
             )
 
@@ -570,7 +573,7 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                     model=model_name,
                     messages=messages,
                     temperature=0.7,
-                    max_tokens=2000,
+                    max_tokens=8000,
                 )
                 fallback = response.choices[0].message.content or ""
                 streamed_parts.append(fallback)
