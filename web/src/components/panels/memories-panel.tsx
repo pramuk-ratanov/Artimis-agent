@@ -117,7 +117,7 @@ function MemoryCard({
       } as React.CSSProperties}
     >
       {/* Content */}
-      <p className="text-body text-ink-primary mb-2 leading-relaxed font-share">
+      <p className="text-body text-ink-primary mb-2 leading-relaxed font-sans">
         {m.content}
       </p>
 
@@ -146,7 +146,7 @@ function MemoryCard({
         </span>
 
         {/* Use count */}
-        <span className="text-caption text-ink-muted font-share">
+        <span className="text-caption text-ink-faint font-share">
           {m.use_count}x
         </span>
 
@@ -252,7 +252,7 @@ function AddForm({ onAdd, onCancel }: AddFormProps) {
         onChange={e => setContent(e.target.value)}
         placeholder="Memory content…"
         rows={3}
-        className="w-full bg-surface-2 border border-surface-3 rounded-control px-2.5 py-1.5 text-body text-ink-primary font-share outline-none placeholder:text-ink-faint focus:border-signal-500 resize-none transition-colors duration-150"
+        className="w-full bg-surface-2 border border-surface-3 rounded-control px-2.5 py-1.5 text-body text-ink-primary font-sans outline-none placeholder:text-ink-faint focus:border-signal-500 resize-none transition-colors duration-150"
       />
       <input
         type="text"
@@ -372,13 +372,13 @@ export function MemoriesPanel() {
   })
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 font-share">
+    <div className="flex-1 overflow-y-auto p-8 font-sans">
       <div className="max-w-4xl mx-auto space-y-4">
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <h2 className="text-heading font-share text-ink-primary">
+            <h2 className="text-heading font-sans text-ink-primary">
               Memories
             </h2>
             <span className="text-caption text-ink-muted bg-surface-2 border border-surface-3 px-2 py-0.5 rounded-control font-share">
@@ -399,7 +399,7 @@ export function MemoriesPanel() {
           value={search}
           onChange={e => handleSearch(e.target.value)}
           placeholder="Search memories…"
-          className="w-full bg-surface-1 border border-surface-3 rounded-control px-3 py-2 text-body text-ink-primary font-share outline-none placeholder:text-ink-faint focus:border-signal-500 transition-colors duration-150"
+          className="w-full bg-surface-1 border border-surface-3 rounded-control px-3 py-2 text-body text-ink-primary font-sans outline-none placeholder:text-ink-faint focus:border-signal-500 transition-colors duration-150"
         />
 
         {/* ── Tag filter pills ── */}
@@ -424,9 +424,9 @@ export function MemoriesPanel() {
 
         {/* ── Memory list ── */}
         {loading ? (
-          <p className="text-label text-ink-muted font-share">Loading…</p>
+          <p className="text-label text-ink-muted font-sans">Loading…</p>
         ) : sorted.length === 0 ? (
-          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted font-share">
+          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted font-sans">
             {search || activeTag !== ALL_TAG
               ? "No memories match your filter."
               : "No memories yet. They accumulate as you talk with the agent."}

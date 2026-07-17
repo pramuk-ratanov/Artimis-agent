@@ -53,11 +53,11 @@ export function BeamEdge({
                 repeatCount="indefinite"
               />
             </stop>
-            <stop offset="15%" stopColor="rgba(14, 165, 233, 0)" />
-            <stop offset="40%" stopColor="rgba(14, 165, 233, 0.35)" />
-            <stop offset="50%" stopColor="rgba(14, 165, 233, 0.5)" />
-            <stop offset="60%" stopColor="rgba(14, 165, 233, 0.35)" />
-            <stop offset="85%" stopColor="rgba(14, 165, 233, 0)" />
+            <stop offset="15%" stopColor="rgba(11, 153, 110, 0)" />
+            <stop offset="40%" stopColor="rgba(11, 153, 110, 0.35)" />
+            <stop offset="50%" stopColor="rgba(11, 153, 110, 0.5)" />
+            <stop offset="60%" stopColor="rgba(11, 153, 110, 0.35)" />
+            <stop offset="85%" stopColor="rgba(11, 153, 110, 0)" />
             <stop offset="100%" stopColor="transparent" />
           </linearGradient>
         )}
@@ -69,7 +69,7 @@ export function BeamEdge({
         y1={y1}
         x2={x2}
         y2={y2}
-        stroke={active ? "transparent" : "#1a1a1a"}
+        stroke={active ? "transparent" : "#D6D3D1"}
         strokeWidth={1}
       />
 

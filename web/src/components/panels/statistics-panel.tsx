@@ -15,7 +15,7 @@ type Summary = {
   critiqueTrend: CritiqueTrendPoint[]
 }
 
-const COLORS = ["oklch(65% 0.08 240)", "oklch(60% 0.06 230)", "oklch(68% 0.05 250)", "oklch(55% 0.1 220)", "oklch(62% 0.07 260)"]
+const COLORS = ["#0B996E", "#34B389", "#0A7A59", "#8BDABB", "#A3A3A3"]
 
 function CriticTrendChart({ data }: { data: CritiqueTrendPoint[] }) {
   const WIDTH = 700
@@ -29,9 +29,9 @@ function CriticTrendChart({ data }: { data: CritiqueTrendPoint[] }) {
 
   const maxScore = 10
   const minScore = 0
-  const LINE_COLOR = "oklch(0.58 0.08 230)"
-  const GRID_COLOR = "oklch(0.15 0.01 240)"
-  const TICK_COLOR = "oklch(0.6 0.01 240)"
+  const LINE_COLOR = "#0B996E"
+  const GRID_COLOR = "#A3A3A3"
+  const TICK_COLOR = "#1C1917"
 
   const avgAll = data.reduce((sum, d) => sum + d.avg_score, 0) / data.length
 
@@ -59,7 +59,7 @@ function CriticTrendChart({ data }: { data: CritiqueTrendPoint[] }) {
         <span className="tag-pill tag-pill-blue font-share ml-2">{data.length}d</span>
       </div>
 
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto" style={{ fontFamily: "'Share Tech Mono', monospace" }}>
+      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full h-auto" style={{ fontFamily: "'Geist Mono Variable', monospace" }}>
         {/* Grid lines + Y labels */}
         {yTicks.map(tick => (
           <g key={tick}>
@@ -161,14 +161,14 @@ export function StatisticsPanel() {
         <h3 className="text-body font-share text-ink-primary mb-3">Focus Areas</h3>
         <ChartContainer config={focusConfig} className="h-[280px] w-full">
           <ComposedChart data={data.focusAreas.map(f => ({ name: f.topic, sessions: f.sessions, messages: f.messages }))} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid vertical={true} strokeDasharray="3 3" stroke="oklch(20% 0.01 240)" />
-            <XAxis dataKey="name" tick={{ fill: "oklch(60% 0.01 240)", fontSize: 11 }} />
-            <YAxis yAxisId="left" tick={{ fill: "oklch(60% 0.01 240)", fontSize: 11 }} />
-            <YAxis yAxisId="right" orientation="right" tick={{ fill: "oklch(60% 0.01 240)", fontSize: 11 }} />
+            <CartesianGrid vertical={true} strokeDasharray="3 3" stroke="#A3A3A3" />
+            <XAxis dataKey="name" tick={{ fill: "#1C1917", fontSize: 11 }} />
+            <YAxis yAxisId="left" tick={{ fill: "#1C1917", fontSize: 11 }} />
+            <YAxis yAxisId="right" orientation="right" tick={{ fill: "#1C1917", fontSize: 11 }} />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', color: 'oklch(60% 0.01 240)' }} />
-            <Bar yAxisId="left" name="Messages (Volume)" dataKey="messages" fill="oklch(28% 0.01 240)" radius={[4, 4, 0, 0]} />
-            <Line yAxisId="right" name="Sessions (Count)" type="monotone" dataKey="sessions" stroke="#ff4a4a" strokeWidth={2} dot={{ stroke: '#ff4a4a', strokeWidth: 2, fill: 'black', r: 4 }} />
+            <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', color: '#1C1917' }} />
+            <Bar yAxisId="left" name="Messages (Volume)" dataKey="messages" fill="#0B996E" radius={[4, 4, 0, 0]} />
+            <Line yAxisId="right" name="Sessions (Count)" type="monotone" dataKey="sessions" stroke="#A3A3A3" strokeWidth={2} dot={{ stroke: '#A3A3A3', strokeWidth: 2, fill: '#1C1917', r: 4 }} />
           </ComposedChart>
         </ChartContainer>
       </div>
@@ -179,10 +179,10 @@ export function StatisticsPanel() {
           <h3 className="text-body font-share text-ink-primary mb-3">Skill Development</h3>
           <ChartContainer config={{}} className="h-[280px] w-full">
             <RadarChart data={data.topSkills}>
-              <PolarGrid stroke="oklch(20% 0.01 240)" />
-              <PolarAngleAxis dataKey="name" tick={{ fill: "oklch(60% 0.01 240)", fontSize: 10 }} />
-              <PolarRadiusAxis tick={{ fill: "oklch(40% 0.01 240)", fontSize: 9 }} />
-              <Radar dataKey="value" stroke="oklch(65% 0.08 240)" fill="oklch(65% 0.08 240)" fillOpacity={0.2} />
+              <PolarGrid stroke="#A3A3A3" />
+              <PolarAngleAxis dataKey="name" tick={{ fill: "#1C1917", fontSize: 10 }} />
+              <PolarRadiusAxis tick={{ fill: "#1C1917", fontSize: 9 }} />
+              <Radar dataKey="value" stroke="#0B996E" fill="#0B996E" fillOpacity={0.2} />
             </RadarChart>
           </ChartContainer>
         </div>

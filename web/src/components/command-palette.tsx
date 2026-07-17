@@ -25,15 +25,15 @@ export function CommandPalette({ isOpen, onClose, actions }: { isOpen: boolean; 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[18vh] bg-black/50 backdrop-blur-sm"
       onClick={onClose}>
-      <div className="bg-surface-2 border border-surface-3 rounded-card shadow-xl w-[520px] max-w-[90vw] overflow-hidden
-        animate-fade-up ring-1 ring-signal-500/20"
+      <div className="bg-surface-1 border border-surface-3 rounded-card w-[520px] max-w-[90vw] overflow-hidden
+        animate-fade-up"
         onClick={e => e.stopPropagation()}>
         <div className="flex items-center border-b border-surface-3">
           <span className="pl-4 text-ink-muted"><MagnifyingGlass size={16} weight="regular" /></span>
           <input ref={inputRef} type="text" value={query}
             onChange={e => { setQuery(e.target.value); setIndex(0) }} onKeyDown={onKey}
             placeholder="Search chats and tools…"
-            className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary font-share
+            className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary font-sans
               py-3 px-3 placeholder:text-ink-muted"
             style={{ caretColor: "var(--color-signal-500)" }}
           />
@@ -42,21 +42,21 @@ export function CommandPalette({ isOpen, onClose, actions }: { isOpen: boolean; 
           {filtered.map((a, i) => (
             <div key={a.id}
               className={`flex items-center justify-between px-4 py-2.5 cursor-pointer transition-colors duration-100
-                ${i === index ? "bg-surface-1 text-ink-primary" : "text-ink-secondary"}`}
+                ${i === index ? "bg-surface-2 text-ink-primary" : "text-ink-secondary"}`}
               onClick={() => { a.action(); onClose() }}
               onMouseEnter={() => setIndex(i)}>
               <div className="flex items-center gap-2.5">
                 {a.icon && <span className={i === index ? "text-signal-400" : "text-ink-muted"}>{a.icon}</span>}
-                <span className="text-label font-medium font-share">{a.label}</span>
+                <span className="text-label font-medium font-sans">{a.label}</span>
               </div>
               {a.shortcut && (
-                <kbd className="text-caption font-mono text-ink-muted bg-surface-1 border border-surface-3
+                <kbd className="text-caption font-share text-ink-muted bg-surface-1 border border-surface-3
                   rounded-control px-1.5 py-0.5">{a.shortcut}</kbd>
               )}
             </div>
           ))}
           {filtered.length === 0 && (
-            <div className="px-4 py-3 text-label text-ink-muted italic">No results</div>
+            <div className="px-4 py-3 text-label text-ink-muted italic font-sans">No results</div>
           )}
         </div>
       </div>

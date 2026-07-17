@@ -22,14 +22,14 @@ export function ThemePanel() {
 
   const darkSwatches = ["#0a0b0d", "#111318", "#181c22", "#1e232c", "#252b36", "#2d3341"]
   const lightSwatches = ["#faf9f7", "#f4f2ef", "#ece9e4", "#dfdbd4", "#d0ccc4", "#c2beb6"]
-  const signalSwatches = ["#7dd3fc", "#38bdf8", "#0ea5e9", "#0284c7", "#0369a1"]
+  const signalSwatches = ["#A8E6CE", "#6FCFAC", "#2FA97F", "#0B996E", "#0B7A5A"]
 
   return (
     <div className="flex-1 overflow-y-auto p-8 font-share">
       <div className="max-w-[65ch] mx-auto">
         <h2 className="text-heading font-semibold text-ink-primary mb-1">Theme</h2>
         <p className="text-body text-ink-secondary mb-6">
-          Charcoal surfaces + sky-blue signal by default. Light theme uses warm off-white
+          Warm peec-paper surfaces + emerald signal by default. Dark theme uses charcoal
           surfaces with the same signal DNA.
         </p>
 
@@ -45,7 +45,7 @@ export function ThemePanel() {
                     ? "border-signal-500 bg-surface-2 text-ink-primary"
                     : "border-surface-3 bg-surface-1 text-ink-secondary hover:bg-surface-2"}`}
               >
-                {t === "dark" ? "Dark — Charcoal" : "Light — Peec"}
+                {t === "dark" ? "Dark" : "Light — default (peec paper)"}
               </button>
             ))}
           </div>
@@ -91,7 +91,7 @@ export function ThemePanel() {
           <p className="text-label text-ink-muted mb-2">TYPOGRAPHY</p>
           <p className="text-display font-semibold text-ink-primary mb-1 heading-default">Display</p>
           <p className="text-heading font-semibold text-ink-primary mb-1">Heading</p>
-          <p className="text-body text-ink-primary mb-1">Body — Share Tech Mono</p>
+          <p className="text-body text-ink-primary mb-1">Body — Geist Mono Variable</p>
           <p className="text-body text-ink-primary mb-1" style={{ fontFamily: "var(--font-sans)" }}>Body — Geist Sans</p>
           <p className="text-label text-ink-secondary mb-1 font-semibold">LABEL</p>
           <p className="text-caption text-ink-muted">caption</p>

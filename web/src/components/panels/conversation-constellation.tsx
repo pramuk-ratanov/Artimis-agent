@@ -3,8 +3,8 @@
  * --------------------------
  * Star-field of conversation nodes. Each session is a node (sized by message
  * count, colored by dominant topic). Edges connect sessions that share
- * significant vocabulary; an EMBER pulse sweeps along each edge to visualize
- * node-to-node relevance — the warm counter-pole to the cool signal-blue nodes.
+ * significant vocabulary; an emerald pulse sweeps along each edge to visualize
+ * node-to-node relevance.
  *
  * Canvas-rendered with a light force-directed layout. No external graph deps.
  */
@@ -12,17 +12,17 @@ import { useEffect, useRef, useState } from "react"
 import * as api from "@/lib/api"
 import type { GraphNode, GraphEdge } from "@/lib/api"
 
-// Topic → Pastel hex colors inspired by Google/DeepMind high-tech graphing.
+// Topic → emerald-family hexes (peec palette: emerald primary, neutral grey fallback).
 const TOPIC_COLOR: Record<string, string> = {
-  coding: "#93C5FD",   // pastel blue
-  ai: "#C4B5FD",       // pastel purple
-  design: "#FCA5A5",   // pastel coral
-  business: "#FCD34D", // pastel yellow
-  infra: "#86EFAC",    // pastel mint
-  general: "#E2E8F0",  // pastel grey
+  coding: "#0B996E",   // primary emerald
+  ai: "#34B389",       // light emerald
+  design: "#5FC7A2",   // pale emerald
+  business: "#0A7A59", // deep emerald
+  infra: "#8BDABB",    // mint emerald
+  general: "#A3A3A3",  // neutral grey
 }
 
-const EMBER = "#FCD34D" // glowing warm accent
+const EMBER = "#0B996E" // emerald pulse fallback accent
 
 interface PNode extends GraphNode {
   x: number
@@ -171,7 +171,7 @@ export function ConversationConstellation() {
         const dimEdge = activeNode && !isConnectedToActive
         
         // Faint Static Edge (very thin)
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.15)" // clean white/grey edge like DeepMind
+        ctx.strokeStyle = "#A3A3A3" // neutral grey edge on light surface
         ctx.globalAlpha = dimEdge ? 0.01 : (0.1 + e.weight * 0.1)
         ctx.lineWidth = 0.4 + e.weight * 0.3 // Ultra thin wires
         ctx.beginPath()
@@ -254,7 +254,7 @@ export function ConversationConstellation() {
       if (hv) {
         const n = byId.get(hv)
         if (n) {
-          ctx.font = "11px 'Share Tech Mono', monospace"
+          ctx.font = "11px 'Geist Mono Variable', monospace"
           const text = n.label.length > 40 ? n.label.slice(0, 40) + "…" : n.label
           const tw = ctx.measureText(text).width
           
@@ -271,11 +271,14 @@ export function ConversationConstellation() {
           const lx = Math.min(W - totalWidth - 16, n.x + 16)
           const ly = n.y - rh / 2
           
-          // Pill background
-          ctx.fillStyle = "oklch(0.16 0.003 30 / 0.92)"
+          // Pill background — white card with neutral hairline, peec tooltip style
+          ctx.fillStyle = "#FFFFFF"
           ctx.beginPath()
           ctx.roundRect(lx, ly, totalWidth, rh, rh / 2)
           ctx.fill()
+          ctx.strokeStyle = "#A3A3A3"
+          ctx.lineWidth = 1
+          ctx.stroke()
           
           // Inner colored shape (capsule or circle depending on text length)
           const cx = lx + pillPadding + innerWidth / 2
@@ -285,15 +288,15 @@ export function ConversationConstellation() {
           ctx.roundRect(lx + pillPadding, cy - circleRadius, innerWidth, circleRadius * 2, circleRadius)
           ctx.fill()
           
-          // Count text
-          ctx.fillStyle = "oklch(0.15 0.01 30)"
+          // Count text — white on emerald capsule
+          ctx.fillStyle = "#FFFFFF"
           ctx.textAlign = "center"
           ctx.textBaseline = "middle"
           ctx.fillText(countText, cx, cy)
           
           // Label text
           ctx.textAlign = "left"
-          ctx.fillStyle = "oklch(0.93 0.002 60)"
+          ctx.fillStyle = "#1C1917"
           ctx.fillText(text, lx + pillPadding + innerWidth + circleMargin, cy)
           
           // Reset
@@ -319,7 +322,7 @@ export function ConversationConstellation() {
         <div>
           <h3 className="text-heading text-ink-primary">Conversation Constellation</h3>
           <p className="text-caption text-ink-muted mt-0.5">
-            Nodes are chats · ember pulses sweep between related conversations
+            Nodes are chats · emerald pulses sweep between related conversations
           </p>
         </div>
         <div className="flex items-center gap-3 text-caption text-ink-muted">
@@ -328,7 +331,7 @@ export function ConversationConstellation() {
             chats
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="inline-block w-2 h-2 rounded-full bg-ember-400" />
+            <span className="inline-block w-3 h-0.5 rounded-full bg-signal-400" />
             relevance
           </span>
         </div>
