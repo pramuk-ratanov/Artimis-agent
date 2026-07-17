@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { Compass, Lightbulb, Scales, Wrench } from "@phosphor-icons/react"
+import { Compass, Lightbulb, Scales, Flask } from "@phosphor-icons/react"
 
 export function HomeState({ onSend, onOpenTool }: {
   onSend: (text: string) => void
@@ -19,13 +19,14 @@ export function HomeState({ onSend, onOpenTool }: {
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-10 overflow-y-auto">
-      <h1 className="text-display font-semibold tracking-tight text-center mb-2 font-sans" style={{ letterSpacing: "-0.02em" }}>
+      {/* Hero: greeting + primary input dominate the view */}
+      <h1 className="text-display font-semibold tracking-tight text-center mb-3 font-sans" style={{ letterSpacing: "-0.02em", fontSize: "1.75rem" }}>
         {greeting}
       </h1>
-      <p className="text-body text-ink-muted mb-8 font-share">What would you like to work on?</p>
+      <p className="text-body text-ink-muted mb-10 font-share">What would you like to work on?</p>
 
-      {/* Quick input */}
-      <div className="max-w-[520px] w-full mb-4">
+      {/* Quick input — the primary action, visually dominant */}
+      <div className="max-w-[560px] w-full mb-10">
         <div className="flex items-stretch bg-surface-1 border border-surface-3 rounded-composer overflow-hidden focus-within:border-signal-400 transition-colors duration-150">
           <input
             type="text"
@@ -35,13 +36,13 @@ export function HomeState({ onSend, onOpenTool }: {
             placeholder="Ask anything..."
             spellCheck={false}
             autoFocus
-            className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary font-share placeholder:text-ink-muted py-2.5 px-3"
+            className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary font-share placeholder:text-ink-muted py-3.5 px-4"
             style={{ caretColor: "var(--color-signal-500)" }}
           />
           <button
             onClick={() => handleSend(quickPrompt)}
             disabled={!quickPrompt.trim()}
-            className="px-5 text-label font-medium font-sans transition-all duration-120 ease-expo-out active:scale-[0.97]
+            className="px-6 text-label font-medium font-sans transition-all duration-120 ease-expo-out active:scale-[0.97]
               bg-surface-2 text-ink-primary hover:bg-surface-3 disabled:bg-transparent disabled:text-ink-muted"
           >
             Send
@@ -49,8 +50,8 @@ export function HomeState({ onSend, onOpenTool }: {
         </div>
       </div>
 
-      {/* Bento grid */}
-      <div className="grid grid-cols-4 gap-3 max-w-[520px] w-full">
+      {/* Secondary actions — quiet, demoted below the hero */}
+      <div className="grid grid-cols-4 gap-2.5 max-w-[560px] w-full opacity-90">
         <button
           onClick={() => onOpenTool("deep-research")}
           className="col-span-4 bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-left group flex items-start gap-3"
@@ -91,7 +92,7 @@ export function HomeState({ onSend, onOpenTool }: {
           className="col-span-2 bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-3 text-left group"
         >
           <div className="w-8 h-8 flex items-center justify-center rounded-control bg-surface-2 mb-2 group-hover:bg-surface-3 transition-colors duration-150">
-            <Wrench size={15} weight="regular" className="text-signal-400" />
+            <Flask size={15} weight="regular" className="text-signal-400" />
           </div>
           <div className="text-label font-semibold text-ink-primary font-sans">Harness Lab</div>
           <div className="text-caption text-ink-muted font-share mt-0.5">Self-improvement experiments</div>

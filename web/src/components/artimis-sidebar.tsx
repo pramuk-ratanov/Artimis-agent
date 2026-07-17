@@ -11,17 +11,32 @@ import { LivingSignal, type SignalState } from "@/components/living-signal"
 export interface Project { id: string; name: string }
 export interface ChatSession { id: string; name: string; projectId: string | null; updatedAt: string }
 
-const TOOLS = [
-  { id: "intelligence", label: "Intelligence", icon: <Brain size={14} weight="regular" /> },
-  { id: "memories", label: "Memories", icon: <Database size={14} weight="regular" /> },
-  { id: "deep-research", label: "Deep Research", icon: <Compass size={14} weight="regular" /> },
-  { id: "gallery", label: "Gallery", icon: <ImageSquare size={14} weight="regular" /> },
-  { id: "notes", label: "Notes", icon: <Note size={14} weight="regular" /> },
-  { id: "tasks", label: "Tasks", icon: <CheckSquare size={14} weight="regular" /> },
-  { id: "skills", label: "Skills", icon: <Wrench size={14} weight="regular" /> },
-  { id: "statistics", label: "Statistics", icon: <ChartBar size={14} weight="regular" /> },
-  { id: "harness-lab", label: "Harness Lab", icon: <Flask size={14} weight="regular" /> },
-  { id: "theme", label: "Theme", icon: <Palette size={14} weight="regular" /> },
+const TOOL_GROUPS: { label: string; tools: { id: string; label: string; icon: React.ReactNode }[] }[] = [
+  {
+    label: "WORKSPACE",
+    tools: [
+      { id: "notes", label: "Notes", icon: <Note size={14} weight="regular" /> },
+      { id: "tasks", label: "Tasks", icon: <CheckSquare size={14} weight="regular" /> },
+      { id: "gallery", label: "Gallery", icon: <ImageSquare size={14} weight="regular" /> },
+    ],
+  },
+  {
+    label: "KNOWLEDGE",
+    tools: [
+      { id: "intelligence", label: "Intelligence", icon: <Brain size={14} weight="regular" /> },
+      { id: "memories", label: "Memories", icon: <Database size={14} weight="regular" /> },
+      { id: "skills", label: "Skills", icon: <Wrench size={14} weight="regular" /> },
+      { id: "deep-research", label: "Deep Research", icon: <Compass size={14} weight="regular" /> },
+    ],
+  },
+  {
+    label: "SYSTEM",
+    tools: [
+      { id: "statistics", label: "Statistics", icon: <ChartBar size={14} weight="regular" /> },
+      { id: "harness-lab", label: "Harness Lab", icon: <Flask size={14} weight="regular" /> },
+      { id: "theme", label: "Theme", icon: <Palette size={14} weight="regular" /> },
+    ],
+  },
 ]
 
 interface Props {
@@ -304,25 +319,28 @@ export function ArtimisSidebar({
           </div>
         )}
 
-        {/* TOOLS */}
-        <div className="mt-3 mb-1 px-2 text-caption font-medium text-ink-muted tracking-wider font-share">
-          TOOLS
-        </div>
-
-        {TOOLS.map(t => (
-          <button
-            key={t.id}
-            onClick={() => { onSelectTool(t.id); if (activeTool === t.id) onSelectTool("") }}
-            className={`sidebar-item w-full flex items-center gap-2 px-2 py-1 text-label rounded-control font-share
-              ${activeTool === t.id
-                ? "bg-surface-2 text-ink-primary border border-surface-3"
-                : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
-          >
-            <span className={activeTool === t.id ? "text-signal-400" : "text-ink-muted"}>
-              {t.icon}
-            </span>
-            <span>{t.label}</span>
-          </button>
+        {/* TOOLS — grouped */}
+        {TOOL_GROUPS.map(group => (
+          <div key={group.label} className="mt-3">
+            <div className="mb-1 px-2 text-caption font-medium text-ink-muted tracking-wider font-share">
+              {group.label}
+            </div>
+            {group.tools.map(t => (
+              <button
+                key={t.id}
+                onClick={() => { onSelectTool(t.id); if (activeTool === t.id) onSelectTool("") }}
+                className={`sidebar-item w-full flex items-center gap-2 px-2 py-1 text-label rounded-control font-share
+                  ${activeTool === t.id
+                    ? "bg-surface-2 text-ink-primary border border-surface-3"
+                    : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
+              >
+                <span className={activeTool === t.id ? "text-signal-400" : "text-ink-muted"}>
+                  {t.icon}
+                </span>
+                <span>{t.label}</span>
+              </button>
+            ))}
+          </div>
         ))}
       </div>
 

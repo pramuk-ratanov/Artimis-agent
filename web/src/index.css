@@ -538,7 +538,22 @@ body {
   animation-delay: var(--pulse-delay, 0s);
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+  animation-play-state: paused;
+  opacity: 0;
+  transition: opacity 0.25s ease;
   border-radius: inherit;
+}
+
+/* Restraint: the scan is an interactive accent, not ambient decoration.
+   It runs while the card is hovered (or focused via keyboard). */
+.card-pulse-glow:hover::after,
+.card-pulse-glow:focus-within::after {
+  animation-play-state: running;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card-pulse-glow::after { animation: none; opacity: 0; }
 }
 
 .card-pulse-glow > * {
