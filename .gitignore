@@ -29,3 +29,4 @@ Thumbs.db
 # Temp
 *.log
 *.tmp
+.venv/

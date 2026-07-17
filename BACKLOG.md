@@ -1,40 +1,40 @@
 # Artimis Backlog
 
-Priority order. Source: full functional audit 2026-07-17 (19/19 live checks passed, 10/10 pytest, build green).
+Status after the 2026-07-17 fix pass (branch: concept/artimis-stability-ux-redesign).
 
-## Blocked on Pramuk decision
+## Canonical deployment — DECIDED
 
-1. **Single canonical deployment.** Two instances exist with separate code and separate databases:
-   - systemd `artimis.service` on port 7001, running as root from `/root/.artimis/agent`
-   - dev workspace on port 7002 from `/home/hermes/workspace/artimis-agent`
-   Pick one. Until then the databases and code drift apart.
+**`http://100.95.117.9:7002` is the canonical instance.**
+- Runs as user-level systemd service `artimis-dev.service` (auto-restart on crash,
+  starts on boot via lingering, 2G memory cap).
+- Code: `/home/hermes/workspace/artimis-agent`, venv at `.venv/`, DB at `~/.artimis/`.
+- Manage: `systemctl --user restart artimis-dev` / `journalctl --user -u artimis-dev`.
 
-2. **Set `ARTIMIS_API_KEY` + `ARTIMIS_ALLOWED_ORIGINS`** on the canonical instance.
-   Verified live: `/api/config` is origin-guarded (403 from foreign origin) but all data
-   endpoints (`/api/memories`, `/api/sessions`, `/api/tasks`, `/api/files`) answer 200 to
-   any client that can reach the port. Server binds `0.0.0.0`. Contained by Tailscale today;
-   exposed if the public IP:port is reachable.
+**Legacy instance**: systemd `artimis.service` on port 7001 runs as root from
+`/root/.artimis/agent` with its own database. Retirement requires root action by Pramuk:
+`systemctl disable --now artimis` after confirming nothing on 7001 is needed.
+The two databases have drifted; 7002 is authoritative.
 
-## Engineering (unblocked)
+## Done (2026-07-17)
 
-3. **Code-split the Sandpack bundle.** Main JS chunk is 1.4MB (444KB gzip) after the canvas
-   migration. Lazy-load the canvas panel so chat stays fast.
+- API key + origin security middleware (browser UI exempt via Origin/Referer check,
+  non-browser clients need `ARTIMIS_API_KEY`). Verified live matrix: UI 200, foreign
+  origin 403, keyless curl 401, valid key 200.
+- Code-split: main bundle 1417KB → 347KB (444KB → 100KB gzip). Canvas + Statistics lazy-load.
+- Auto-name fires backend-side after first exchange (both agent paths); API-created
+  sessions no longer stall at "New Chat".
+- audit.py authenticates with the API key and deletes its test session (20/20 pass).
+- Harness Lab panel uses the typed api client.
+- Light theme ("Peec") with Theme-panel toggle, localStorage persistence, `?theme=` URL
+  override. Body font now Geist Variable; Share Tech Mono kept for logo/labels/composer/code.
+- Sidebar grouped: WORKSPACE / KNOWLEDGE / SYSTEM. Flask icon for Harness Lab.
+- Home: hero-first layout. Card pulse-glow now hover/focus-only + reduced-motion safe.
 
-4. **Auto-name sessions created via API.** Auto-naming only fires from the frontend, so
-   API/agent-created sessions stay "New Chat" forever. Move the trigger backend-side.
+## Remaining
 
-5. **audit.py cleanup.** The script leaves its test sessions in the DB. Delete what it creates.
-
-6. **Harness Lab panel** uses raw `fetch` instead of the typed `api.ts` client. Align it.
-
-7. **No UI for skills-ingest or models endpoints** (`POST /api/skills/ingest`,
-   `GET /api/models/*`). Either surface them or document as API-only.
-
-## UX direction (Peec AI reference, from audit)
-
-8. Body/UI font → Geist Variable (already in deps); keep Share Tech Mono for logo/labels/code.
-9. Light theme variant of the token system (currently charcoal-only).
-10. Sidebar IA: 10 flat tools → grouped (Workspace / Knowledge / System). Fix duplicate
-    Wrench icon on Skills + Harness Lab.
-11. Home state: hero-first layout instead of equal-weight bento.
-12. Reserve card pulse-glow for active states, not ambient decoration.
+1. **Retire the root 7001 instance** (needs root; see above).
+2. **Skills-ingest and models endpoints have no UI** (`POST /api/skills/ingest`,
+   `GET /api/models/*`) — document as API-only or surface in Settings.
+3. **Home-state quick actions are static** — could be personalized from usage patterns.
+4. **Self-hosted Sandpack bundler** for fully-offline Canvas privacy
+   (`VITE_SANDPACK_BUNDLER_URL`), see canvas-architecture-problem.md.
