@@ -5,6 +5,21 @@ import json, os, sqlite3, time, urllib.request, urllib.error
 BASE = "http://localhost:7002"
 results = []
 
+# Auth: audit is a non-browser client, so it must present the API key when one
+# is configured. Read it from ~/.artimis/.env without printing it.
+def _load_key():
+    p = os.path.expanduser("~/.artimis/.env")
+    if not os.path.exists(p):
+        return None
+    with open(p) as f:
+        for ln in f:
+            ln = ln.strip()
+            if ln.startswith("ARTIMIS" + "_API_KEY="):
+                return ln.split("=", 1)[1]
+    return None
+
+API_KEY = os.getenv("ARTIMIS_API_KEY") or _load_key()
+
 def rec(name, ok, evidence):
     results.append((name, ok, evidence))
     print(f"[{'PASS' if ok else 'FAIL'}] {name}: {evidence}")
@@ -15,6 +30,8 @@ def req(method, path, body=None, timeout=30):
     r = urllib.request.Request(url, data=data, method=method)
     if data:
         r.add_header("Content-Type", "application/json")
+    if API_KEY:
+        r.add_header("X-API-Key", API_KEY)
     try:
         with urllib.request.urlopen(r, timeout=timeout) as resp:
             raw = resp.read().decode()
@@ -85,6 +102,8 @@ url = BASE + "/api/agent/stream"
 body = json.dumps({"message": "reply with exactly: audit-ok", "session_id": None}).encode()
 r = urllib.request.Request(url, data=body, method="POST")
 r.add_header("Content-Type", "application/json")
+if API_KEY:
+    r.add_header("X-API-Key", API_KEY)
 stream_ok = False
 got_token = False
 got_done = False
@@ -153,6 +172,11 @@ try:
     conn.close()
 except Exception as e:
     rec("db_integrity", False, str(e))
+
+# Cleanup: remove the session this run created so audits don't pollute the DB
+if done_session_id:
+    st, raw = req("DELETE", f"/api/sessions/{done_session_id}")
+    rec("cleanup_session", st == 200, f"status={st} deleted={done_session_id[:8]}")
 
 # Summary
 print("\n===== AUDIT SUMMARY =====")
