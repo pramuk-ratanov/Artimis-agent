@@ -1,34 +1,15 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
-
-interface Snapshot {
-  id: string
-  version: number
-  component: string
-  source: string
-  created_at: string
-}
-
-interface Experiment {
-  id: string
-  hypothesis: string
-  component: string
-  before_version: number
-  after_version: number | null
-  outcome: string
-  score_before: number | null
-  score_after: number | null
-  created_at: string
-  completed_at: string | null
-}
-
-interface TestCase {
-  id: string
-  input_message: string
-  expected_traits: string
-  created_at: string
-}
+import {
+  getHarnessVersions,
+  getHarnessExperiments,
+  getHarnessTestCases,
+  createHarnessSnapshot,
+  type HarnessSnapshot as Snapshot,
+  type HarnessExperiment as Experiment,
+  type HarnessTestCase as TestCase,
+} from "@/lib/api"
 
 export function HarnessLabPanel() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
@@ -40,9 +21,9 @@ export function HarnessLabPanel() {
   const fetchAll = useCallback(() => {
     setLoading(true)
     Promise.all([
-      fetch("/api/harness/versions?limit=20").then(r => r.json()).catch(() => []),
-      fetch("/api/harness/experiments?limit=20").then(r => r.json()).catch(() => []),
-      fetch("/api/harness/test-cases").then(r => r.json()).catch(() => []),
+      getHarnessVersions(20).catch(() => []),
+      getHarnessExperiments(20).catch(() => []),
+      getHarnessTestCases().catch(() => []),
     ]).then(([s, e, t]) => {
       setSnapshots(s)
       setExperiments(e)
@@ -55,11 +36,7 @@ export function HarnessLabPanel() {
   const handleSnapshot = async (component: string) => {
     setSnapshotMsg("Taking snapshot...")
     try {
-      const res = await fetch("/api/harness/snapshot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ component, source: "manual" }),
-      }).then(r => r.json())
+      const res = await createHarnessSnapshot(component, "manual")
       setSnapshotMsg(`Snapshotted: ${res.count} component(s) at v${res.latest_version}`)
       fetchAll()
     } catch {

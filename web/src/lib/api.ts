@@ -623,3 +623,53 @@ export function getFiles() {
 export function deleteFile(id: string) {
   return fetchJSON<{ deleted: true }>(`/api/files/${id}`, { method: "DELETE" })
 }
+
+
+// ── Harness Lab ──
+
+export interface HarnessSnapshot {
+  id: string
+  version: number
+  component: string
+  source: string
+  created_at: string
+}
+
+export interface HarnessExperiment {
+  id: string
+  hypothesis: string
+  component: string
+  before_version: number
+  after_version: number | null
+  outcome: string
+  score_before: number | null
+  score_after: number | null
+  created_at: string
+  completed_at: string | null
+}
+
+export interface HarnessTestCase {
+  id: string
+  input_message: string
+  expected_traits: string
+  created_at: string
+}
+
+export function getHarnessVersions(limit = 20) {
+  return fetchJSON<HarnessSnapshot[]>(`/api/harness/versions?limit=${limit}`)
+}
+
+export function getHarnessExperiments(limit = 20) {
+  return fetchJSON<HarnessExperiment[]>(`/api/harness/experiments?limit=${limit}`)
+}
+
+export function getHarnessTestCases() {
+  return fetchJSON<HarnessTestCase[]>("/api/harness/test-cases")
+}
+
+export function createHarnessSnapshot(component: string, source = "manual") {
+  return fetchJSON<{ count: number; latest_version: number }>("/api/harness/snapshot", {
+    method: "POST",
+    body: JSON.stringify({ component, source }),
+  })
+}
