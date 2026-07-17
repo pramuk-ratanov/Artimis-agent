@@ -36,11 +36,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map(t => (
           <div
             key={t.id}
-            className={`pointer-events-auto animate-toast-in px-4 py-2.5 rounded-control border font-share text-label shadow-lg
-              ${t.type === "success" ? "bg-surface-2 border-signal-600 text-signal-400" :
-                t.type === "error" ? "bg-surface-2 border-error/50 text-error" :
-                "bg-surface-2 border-surface-3 text-ink-secondary"}`}
+            className="pointer-events-auto animate-toast-in flex items-center gap-2 px-4 py-2.5 rounded-card border border-surface-3 bg-surface-1 font-sans text-label text-ink-primary shadow-sm"
           >
+            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.type === "success" ? "bg-signal-400" : t.type === "error" ? "bg-error" : "bg-ink-faint"}`} />
             {t.message}
           </div>
         ))}

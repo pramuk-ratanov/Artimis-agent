@@ -91,12 +91,12 @@ function ChatItemMenu({
   return (
     <div
       ref={ref}
-      className="absolute right-0 top-full mt-0.5 z-50 bg-surface-2 border border-surface-3
-        rounded-card shadow-lg overflow-hidden min-w-[120px]"
+      className="absolute right-0 top-full mt-0.5 z-50 bg-surface-1 border border-surface-3
+        rounded-card overflow-hidden min-w-[120px]"
     >
       <button
         onClick={() => { onArchive(); onClose() }}
-        className="w-full flex items-center gap-2 px-3 py-2 text-label font-share
+        className="w-full flex items-center gap-2 px-3 py-2 text-label font-sans
           text-ink-secondary hover:bg-surface-3 hover:text-ink-primary transition-colors duration-100"
       >
         <Archive size={12} weight="regular" className="text-ink-muted" />
@@ -105,7 +105,7 @@ function ChatItemMenu({
       {!confirmDelete ? (
         <button
           onClick={() => setConfirmDelete(true)}
-          className="w-full flex items-center gap-2 px-3 py-2 text-label font-share
+          className="w-full flex items-center gap-2 px-3 py-2 text-label font-sans
             text-ink-secondary hover:bg-surface-3 hover:text-error transition-colors duration-100"
         >
           <Trash size={12} weight="regular" className="text-ink-muted" />
@@ -113,18 +113,18 @@ function ChatItemMenu({
         </button>
       ) : (
         <div className="px-3 py-2 border-t border-surface-3">
-          <p className="text-caption text-ink-muted font-share mb-1.5">Delete forever?</p>
+          <p className="text-caption text-ink-muted font-sans mb-1.5">Delete forever?</p>
           <div className="flex gap-1.5">
             <button
               onClick={() => { onDelete(); onClose() }}
-              className="flex-1 px-2 py-1 text-caption font-semibold font-share
+              className="flex-1 px-2 py-1 text-caption font-semibold font-sans
                 bg-error/20 text-error hover:bg-error/30 rounded-control transition-colors duration-100"
             >
               Yes
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
-              className="flex-1 px-2 py-1 text-caption font-share
+              className="flex-1 px-2 py-1 text-caption font-sans
                 bg-surface-3 text-ink-muted hover:text-ink-secondary rounded-control transition-colors duration-100"
             >
               No
@@ -161,7 +161,7 @@ function ChatItem({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => { setHovered(false); if (!menuOpen) setMenuOpen(false) }}
     >
-      <div className={`sidebar-item flex items-center rounded-control font-share
+      <div className={`sidebar-item flex items-center rounded-control font-sans
         ${isActive
           ? "bg-surface-2 text-ink-primary border border-surface-3"
           : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
@@ -226,7 +226,7 @@ export function ArtimisSidebar({
       {/* Header */}
       <div className="px-4 py-3.5 flex items-center gap-3 border-b border-surface-3 shrink-0">
         <LivingSignal state={signalState} />
-        <span className="text-body font-bold text-signal-400 tracking-widest uppercase font-share">
+        <span className="text-body font-sans font-semibold tracking-tight text-ink-primary">
           Artimis
         </span>
       </div>
@@ -238,7 +238,7 @@ export function ArtimisSidebar({
         <div className="flex items-center gap-1 h-7">
           <button
             onClick={() => setChatsOpen(!chatsOpen)}
-            className="flex-1 flex items-center gap-1.5 px-2 text-label font-medium text-ink-muted
+            className="flex-1 flex items-center gap-1.5 px-2 text-label font-medium text-ink-muted uppercase
               hover:text-ink-secondary transition-colors duration-150 font-share"
           >
             {chatsOpen ? <CaretDown size={10} /> : <CaretRight size={10} />}
@@ -270,7 +270,7 @@ export function ArtimisSidebar({
 
             {folders.map(f => (
               <div key={f.name} className="mt-1">
-                <div className="px-2 py-1 text-caption font-medium text-ink-muted/70 tracking-wider font-share">
+                <div className="px-2 py-1 text-caption font-medium text-ink-muted tracking-wider uppercase font-share">
                   {f.name} <span className="text-ink-faint ml-1">{f.chats.length}</span>
                 </div>
                 {f.chats.map(c => (
@@ -290,7 +290,7 @@ export function ArtimisSidebar({
               <button
                 onClick={() => setShowingNewProject(true)}
                 className="w-full text-left px-2 py-1 text-caption font-medium text-ink-muted
-                  hover:text-ink-secondary transition-colors font-share"
+                  hover:text-ink-secondary transition-colors font-sans"
               >
                 + New project
               </button>
@@ -305,12 +305,12 @@ export function ArtimisSidebar({
                   autoFocus
                   spellCheck={false}
                   className="flex-1 bg-surface-2 border border-surface-3 rounded-control px-2 py-1
-                    text-label text-ink-primary font-share outline-none placeholder:text-ink-faint"
+                    text-label text-ink-primary font-sans outline-none placeholder:text-ink-faint"
                 />
                 <button
                   onClick={handleCreateProject}
-                  className="px-2 py-1 text-label font-medium text-signal-400 hover:text-signal-300
-                    transition-colors font-share"
+                  className="px-2 py-1 text-label font-medium text-signal-400 hover:text-signal-600
+                    transition-colors font-sans"
                 >
                   OK
                 </button>
@@ -322,14 +322,14 @@ export function ArtimisSidebar({
         {/* TOOLS — grouped */}
         {TOOL_GROUPS.map(group => (
           <div key={group.label} className="mt-3">
-            <div className="mb-1 px-2 text-caption font-medium text-ink-muted tracking-wider font-share">
+            <div className="mb-1 px-2 text-caption font-medium text-ink-muted tracking-wider uppercase font-share">
               {group.label}
             </div>
             {group.tools.map(t => (
               <button
                 key={t.id}
                 onClick={() => { onSelectTool(t.id); if (activeTool === t.id) onSelectTool("") }}
-                className={`sidebar-item w-full flex items-center gap-2 px-2 py-1 text-label rounded-control font-share
+                className={`sidebar-item w-full flex items-center gap-2 px-2 py-1 text-label rounded-control font-sans
                   ${activeTool === t.id
                     ? "bg-surface-2 text-ink-primary border border-surface-3"
                     : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
@@ -347,10 +347,10 @@ export function ArtimisSidebar({
       {/* Footer */}
       <div className="h-[42px] px-4 flex items-center justify-between border-t border-surface-3 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-signal-600 flex items-center justify-center text-caption font-bold text-ink-primary font-share">
+          <div className="w-5 h-5 rounded-full bg-ink-primary flex items-center justify-center text-caption font-semibold text-white font-sans">
             AD
           </div>
-          <span className="text-label font-medium text-ink-secondary font-share">admin</span>
+          <span className="text-label font-medium text-ink-secondary font-sans">admin</span>
         </div>
         <button
           onClick={onOpenSettings}

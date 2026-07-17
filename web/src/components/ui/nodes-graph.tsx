@@ -45,8 +45,8 @@ function NodeShape({
   onClick?: (node: GraphNode) => void
 }) {
   const shape = CATEGORY_SHAPES[node.category]
-  const baseColor = node.active ? "#0ea5e9" : "#5c6270"
-  const glowColor = node.active ? "rgba(14, 165, 233, 0.4)" : "transparent"
+  const baseColor = node.active ? "#0B996E" : "#A3A3A3"
+  const glowColor = node.active ? "rgba(11, 153, 110, 0.35)" : "transparent"
 
   const commonStyle: React.CSSProperties = {
     position: "absolute",
@@ -214,13 +214,13 @@ export function NodesGraph({
               top: node.y + 10,
               transform: "translateX(-50%)",
               fontSize: 10,
-              fontFamily: "Inconsolata, monospace",
+              fontFamily: "'Geist Mono Variable', monospace",
               color:
                 hoveredNode === node.id
-                  ? "#ffffff"
+                  ? "#1C1917"
                   : node.active
-                  ? "#9da3b0"
-                  : "#5c6270",
+                  ? "#525252"
+                  : "#A3A3A3",
               whiteSpace: "nowrap",
               pointerEvents: "none",
               transition: "color 0.15s ease",
@@ -257,8 +257,8 @@ export function NodesGraph({
           display: "flex",
           gap: 12,
           fontSize: 9,
-          fontFamily: "Inconsolata, monospace",
-          color: "#5c6270",
+          fontFamily: "'Geist Mono Variable', monospace",
+          color: "#A3A3A3",
         }}
       >
         <span>o conversation</span>

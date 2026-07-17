@@ -36,18 +36,27 @@ export function IntroScreen({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-surface-0 cursor-pointer"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-surface-0 cursor-pointer font-sans"
       onClick={onComplete}
     >
-      <div className="text-center">
-        <h1 className="heading-default text-[2rem] font-semibold tracking-tight text-ink-primary mb-2">
+      <div className="bg-surface-1 border border-surface-3 rounded-card px-12 py-10 text-center">
+        <h1 className="text-[2rem] font-sans font-semibold tracking-tight text-ink-primary mb-2">
           {text}
           {!showSubtitle && <span className="caret-blink text-signal-400">_</span>}
         </h1>
         {showSubtitle && (
-          <p className="text-body text-ink-secondary animate-fade-up" style={{ fontFamily: "var(--font-sans)" }}>
-            A thinking partner, not a yes-machine
-          </p>
+          <div className="animate-fade-up">
+            <p className="text-body font-sans text-ink-secondary">
+              A thinking partner, not a yes-machine
+            </p>
+            <button
+              onClick={e => { e.stopPropagation(); onComplete() }}
+              className="mt-6 px-4 py-2 rounded-control bg-ink-primary text-white text-label font-medium font-sans
+                hover:opacity-90 transition-opacity duration-150"
+            >
+              Enter Artimis
+            </button>
+          </div>
         )}
       </div>
     </div>

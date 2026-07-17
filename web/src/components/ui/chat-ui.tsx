@@ -312,7 +312,7 @@ export function ChatUI({
                           return (
                             <div key={msg.id} className={mi > 0 ? "mt-3" : ""}>
                               {msg.role === "user" ? (
-                                <p className="text-body text-ink-secondary font-share leading-relaxed whitespace-pre-wrap">
+                                <p className="w-fit max-w-full bg-surface-1 border border-surface-3 rounded-card px-4 py-2.5 text-body text-ink-primary font-sans leading-relaxed whitespace-pre-wrap">
                                   {msg.content}
                                 </p>
                               ) : (
@@ -355,9 +355,11 @@ export function ChatUI({
                                           <div key={tcId} className="mb-1">
                                             <button
                                               onClick={() => toggleToolBlock(tcId)}
-                                              className="flex items-center gap-1.5 text-code font-mono text-ink-muted
+                                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-surface-3
+                                                font-share text-caption text-ink-muted
                                                 hover:text-ink-secondary transition-colors duration-150"
                                             >
+                                              <span className="w-1.5 h-1.5 rounded-full bg-signal-400" />
                                               <span className="text-[10px]">{open ? "\u25BE" : "\u25B8"}</span>
                                               <span>{tc.name}</span>
                                             </button>
@@ -377,13 +379,13 @@ export function ChatUI({
                                     <div className="flex gap-3 mt-1.5 opacity-0 group-hover/msg:opacity-100 transition-opacity duration-150">
                                       <button
                                         onClick={() => handleCopy(msg.content, msg.id)}
-                                        className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors"
+                                        className="text-caption font-share text-ink-muted hover:text-ink-primary hover:bg-surface-2 rounded-control px-2 py-1 transition-colors"
                                       >
                                         {copiedId === msg.id ? "Copied" : "Copy"}
                                       </button>
                                       {isLastOverall && onRetry && (
                                         <button onClick={onRetry}
-                                          className="text-caption font-share text-ink-muted hover:text-ink-secondary transition-colors">
+                                          className="text-caption font-share text-ink-muted hover:text-ink-primary hover:bg-surface-2 rounded-control px-2 py-1 transition-colors">
                                           Retry
                                         </button>
                                       )}
@@ -455,17 +457,17 @@ export function ChatUI({
               spellCheck={false}
               autoComplete="off"
               className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary
-                font-share placeholder:text-ink-muted py-2.5 px-1"
+                font-sans placeholder:text-ink-muted py-2.5 px-1"
               style={{ caretColor: "var(--color-signal-500)" }}
             />
             <SpotlightButton>
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className={`px-5 text-label font-medium font-sans transition-all duration-120 ease-expo-out
+                className={`px-4 text-label font-medium font-sans rounded-control transition-all duration-120 ease-expo-out
                   active:scale-[0.97]
                   ${input.trim() && !isLoading
-                    ? "bg-surface-2 text-ink-primary hover:bg-surface-3"
+                    ? "bg-ink-primary text-white hover:bg-surface-5"
                     : "bg-transparent text-ink-muted"}`}
               >
                 Send

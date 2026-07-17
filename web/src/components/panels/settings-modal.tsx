@@ -130,7 +130,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
     >
       <div
         className="bg-surface-1 border border-surface-3 rounded-card w-[500px] max-w-[92vw] max-h-[88vh]
-          overflow-hidden font-share flex flex-col"
+          overflow-hidden font-sans flex flex-col"
         onClick={e => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -236,7 +236,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
         {/* ── Footer ── */}
         <div className="border-t border-surface-3 px-5 py-3 flex items-center justify-between shrink-0">
           {/* Status feedback */}
-          <div className="text-caption font-share min-w-0">
+          <div className="text-caption min-w-0">
             {saved  && <span className="text-ok font-semibold">✓ Saved</span>}
             {error  && <span className="text-error truncate">{error}</span>}
           </div>
