@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
+import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react"
 import { Bell } from "@phosphor-icons/react"
 import { IntroScreen } from "@/components/intro-screen"
 import { ChatUI, type ChatMessage } from "@/components/ui/chat-ui"
@@ -17,10 +17,14 @@ import { NotesPanel } from "@/components/panels/notes-panel"
 import { TasksPanel } from "@/components/panels/tasks-panel"
 import { SkillsPanel } from "@/components/panels/skills-panel"
 import { ThemePanel } from "@/components/panels/theme-panel"
-import { StatisticsPanel } from "@/components/panels/statistics-panel"
 import { HarnessLabPanel } from "@/components/panels/harness-lab-panel"
 import { SettingsModal } from "@/components/panels/settings-modal"
-import { CanvasPanel } from "@/components/panels/canvas-panel"
+const CanvasPanel = lazy(() =>
+  import("@/components/panels/canvas-panel").then(m => ({ default: m.CanvasPanel }))
+)
+const StatisticsPanel = lazy(() =>
+  import("@/components/panels/statistics-panel").then(m => ({ default: m.StatisticsPanel }))
+)
 import { ToastProvider } from "@/components/ui/toast"
 
 function gen() {
@@ -341,7 +345,11 @@ function App() {
       case "notes": return <NotesPanel />
       case "tasks": return <TasksPanel />
       case "skills": return <SkillsPanel />
-      case "statistics": return <StatisticsPanel />
+      case "statistics": return (
+        <Suspense fallback={<div className="p-6 text-label text-ink-muted font-share">Loading statistics…</div>}>
+          <StatisticsPanel />
+        </Suspense>
+      )
       case "harness-lab": return <HarnessLabPanel />
       case "theme": return <ThemePanel />
       default: return null
@@ -403,11 +411,17 @@ function App() {
                   />
                 </div>
                 {canvasState.isOpen && (
-                  <CanvasPanel 
-                    title={canvasState.title} 
-                    content={canvasState.content} 
-                    onClose={() => setCanvasState(s => ({ ...s, isOpen: false }))} 
-                  />
+                  <Suspense fallback={
+                    <div className="flex items-center justify-center w-1/2 h-full bg-surface-1 border-l border-surface-3">
+                      <span className="text-label text-ink-muted font-share">Loading canvas…</span>
+                    </div>
+                  }>
+                    <CanvasPanel
+                      title={canvasState.title}
+                      content={canvasState.content}
+                      onClose={() => setCanvasState(s => ({ ...s, isOpen: false }))}
+                    />
+                  </Suspense>
                 )}
               </div>
             )}
