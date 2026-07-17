@@ -262,6 +262,7 @@ function App() {
           // (The start event does not carry it.) Capture it for ID sync below.
           if (value.session_id) sessionId = value.session_id
         } else if (value.type === "error") {
+          if (value.session_id) sessionId = value.session_id
           if (!responseText) responseText = value.content || "Something went wrong."
           setChats(p => p.map(c => c.id === activeChatId ? {
             ...c,

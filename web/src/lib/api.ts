@@ -502,6 +502,7 @@ export interface Config {
     OPENAI_API_KEY: string
     OPENROUTER_API_KEY: string
     ANTHROPIC_API_KEY: string
+    SAKANA_API_KEY: string
   }
 }
 
@@ -511,6 +512,7 @@ export interface ConfigUpdate {
   OPENAI_API_KEY?: string
   OPENROUTER_API_KEY?: string
   ANTHROPIC_API_KEY?: string
+  SAKANA_API_KEY?: string
 }
 
 export function getConfig() {

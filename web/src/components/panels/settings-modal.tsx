@@ -9,6 +9,12 @@ import type { ConfigUpdate } from "@/lib/api"
 
 const MODEL_GROUPS = [
   {
+    label: "Sakana AI",
+    options: [
+      { value: "sakana/fuga", label: "sakana/fuga" },
+    ],
+  },
+  {
     label: "DeepSeek",
     options: [
       { value: "deepseek-v4-pro",   label: "deepseek-v4-pro" },
@@ -36,11 +42,12 @@ const MODEL_GROUPS = [
 // ── Key field descriptor ─────────────────────────────────────────────────────
 
 type KeyField = {
-  id: keyof Pick<ConfigUpdate, "DEEPSEEK_API_KEY" | "OPENAI_API_KEY" | "OPENROUTER_API_KEY" | "ANTHROPIC_API_KEY">
+  id: keyof Pick<ConfigUpdate, "DEEPSEEK_API_KEY" | "OPENAI_API_KEY" | "OPENROUTER_API_KEY" | "ANTHROPIC_API_KEY" | "SAKANA_API_KEY">
   label: string
 }
 
 const KEY_FIELDS: KeyField[] = [
+  { id: "SAKANA_API_KEY",     label: "Sakana API Key" },
   { id: "DEEPSEEK_API_KEY",   label: "DeepSeek API Key" },
   { id: "OPENAI_API_KEY",     label: "OpenAI API Key" },
   { id: "OPENROUTER_API_KEY", label: "OpenRouter API Key" },
@@ -71,6 +78,7 @@ export function SettingsModal({ isOpen, onClose }: { isOpen: boolean; onClose: (
           OPENAI_API_KEY:     cfg.keys?.OPENAI_API_KEY     ?? "",
           OPENROUTER_API_KEY: cfg.keys?.OPENROUTER_API_KEY ?? "",
           ANTHROPIC_API_KEY:  cfg.keys?.ANTHROPIC_API_KEY  ?? "",
+          SAKANA_API_KEY:     cfg.keys?.SAKANA_API_KEY     ?? "",
         })
         // Reset user-typed values on fresh open
         setKeys({})

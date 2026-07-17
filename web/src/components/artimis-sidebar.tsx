@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import {
   CaretDown, CaretRight, Brain, ImageSquare, Note,
   CheckSquare, Wrench, Database, Palette, Gear, Compass,
-  Archive, Trash, DotsThree, ChartBar,
+  Archive, Trash, DotsThree, ChartBar, Plus,
 } from "@phosphor-icons/react"
 import { LivingSignal, type SignalState } from "@/components/living-signal"
 
@@ -133,6 +133,7 @@ function ChatItem({
 }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [hovered, setHovered] = useState(false)
+  const isDraft = !chat.updatedAt
 
   // Deterministic pulse per chat — same rhythm every time
   const idHash = chat.id.split("").reduce((a, c) => a + c.charCodeAt(0), 0)
@@ -158,9 +159,10 @@ function ChatItem({
         <button
           onClick={onSelect}
           className="flex-1 text-left px-2 py-1 text-label truncate min-w-0"
-          title={chat.name || "Empty Session"}
+          title={isDraft ? "Draft chat — saved after first message" : (chat.name || "Empty Session")}
         >
-          {chat.name || "Empty Session"}
+          <span className={isDraft ? "text-ink-muted" : undefined}>{chat.name || "Empty Session"}</span>
+          {isDraft && <span className="ml-1 text-caption text-ink-faint">draft</span>}
         </button>
 
         {/* Dots button — only visible on hover or when menu is open */}
@@ -187,7 +189,7 @@ function ChatItem({
 
 export function ArtimisSidebar({
   projects, chats, activeChatId, signalState,
-  onNewChat: _onNewChat, onSelectChat, onCreateProject, onSelectTool, onOpenSettings, activeTool,
+  onNewChat, onSelectChat, onCreateProject, onSelectTool, onOpenSettings, activeTool,
   onArchiveChat, onDeleteChat,
 }: Props) {
   const [chatsOpen, setChatsOpen] = useState(true)
@@ -218,14 +220,25 @@ export function ArtimisSidebar({
       <div className="flex-1 overflow-y-auto px-3">
 
         {/* CHATS */}
-        <button
-          onClick={() => setChatsOpen(!chatsOpen)}
-          className="w-full flex items-center gap-1.5 h-7 px-2 text-label font-medium text-ink-muted
-            hover:text-ink-secondary transition-colors duration-150 font-share"
-        >
-          {chatsOpen ? <CaretDown size={10} /> : <CaretRight size={10} />}
-          <span>CHATS</span>
-        </button>
+        <div className="flex items-center gap-1 h-7">
+          <button
+            onClick={() => setChatsOpen(!chatsOpen)}
+            className="flex-1 flex items-center gap-1.5 px-2 text-label font-medium text-ink-muted
+              hover:text-ink-secondary transition-colors duration-150 font-share"
+          >
+            {chatsOpen ? <CaretDown size={10} /> : <CaretRight size={10} />}
+            <span>CHATS</span>
+          </button>
+          <button
+            onClick={() => onNewChat(null)}
+            title="Start a new chat"
+            aria-label="Start a new chat"
+            className="h-6 w-6 flex items-center justify-center rounded-control border border-surface-3
+              text-ink-muted hover:text-ink-primary hover:bg-surface-2 transition-colors duration-150"
+          >
+            <Plus size={12} weight="bold" />
+          </button>
+        </div>
 
         {chatsOpen && (
           <div className="ml-1.5 mt-0.5 space-y-0.5">
