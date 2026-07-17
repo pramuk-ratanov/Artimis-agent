@@ -57,27 +57,41 @@ async def api_key_auth_middleware(request: Request, call_next):
     """
     path = request.url.path
     if path.startswith("/api") and path != "/api/health":
-        # The config endpoint manages API keys/model routing. Even when ARTIMIS_API_KEY
-        # is not configured, reject browser calls from non-Artimis origins.
-        if path == "/api/config":
-            origin = request.headers.get("Origin")
-            if origin and origin.rstrip("/") not in _ALLOWED_ORIGINS:
+        origin = request.headers.get("Origin", "").rstrip("/")
+        referer = request.headers.get("Referer", "")
+
+        # Browsers always attach an Origin (or same-origin Referer) to API calls.
+        # A browser Origin that is NOT the Artimis UI is a cross-site attempt: reject.
+        # This applies even when no API key is configured.
+        if origin and origin not in _ALLOWED_ORIGINS:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "Origin not allowed"},
+            )
+        if not origin and referer:
+            from urllib.parse import urlparse
+            ref_origin = f"{urlparse(referer).scheme}://{urlparse(referer).netloc}".rstrip("/")
+            if ref_origin not in _ALLOWED_ORIGINS:
                 return JSONResponse(
                     status_code=403,
-                    content={"detail": "Origin not allowed for config access"},
+                    content={"detail": "Origin not allowed"},
                 )
 
+        # Non-browser clients (curl, scripts, server-to-server) carry no Origin.
+        # When ARTIMIS_API_KEY is configured, those clients must authenticate.
+        # The Artimis UI itself is exempt because its Origin was validated above.
+        is_browser = bool(origin) or bool(referer)
         expected_key = os.getenv("ARTIMIS_API_KEY") or _read_env_file().get("ARTIMIS_API_KEY")
-        
-        if expected_key:
+
+        if expected_key and not is_browser:
             api_key = request.headers.get("X-API-Key")
-            
+
             # Check Bearer Authorization fallback
             if not api_key:
                 auth_header = request.headers.get("Authorization")
                 if auth_header and auth_header.startswith("Bearer "):
                     api_key = auth_header[len("Bearer "):]
-            
+
             # Constant-time comparison to mitigate timing side-channel attacks
             if not api_key or not secrets.compare_digest(api_key, expected_key):
                 return JSONResponse(
