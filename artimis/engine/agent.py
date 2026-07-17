@@ -35,6 +35,7 @@ if os.path.exists(_ENV_FILE):
 
 # Default model — supported models:
 #   DeepSeek:   deepseek-v4-pro, deepseek-v4-flash
+#   Sakana:     sakana/fuga
 #   OpenAI:     gpt-4o, gpt-4o-mini, gpt-5.5
 #   OpenRouter: anthropic/claude-sonnet-4, anthropic/claude-opus-4, openai/gpt-5.5-pro
 DEFAULT_MODEL = os.getenv("ARTIMIS_MODEL", "deepseek-v4-pro")
@@ -45,15 +46,17 @@ def _get_client(model: Optional[str] = None) -> OpenAI:
 
     Routing priority:
       1. If model is prefixed with 'openai/' or 'anthropic/' → OpenRouter
-      2. DEEPSEEK_API_KEY  → DeepSeek
-      3. OPENAI_API_KEY / GPT_API_KEY → OpenAI
-      4. OPENROUTER_API_KEY → OpenRouter (generic fallback)
-      5. ANTHROPIC_API_KEY → OpenRouter (legacy alias)
+      2. If model is prefixed with 'sakana/' → native Sakana API only
+      3. DEEPSEEK_API_KEY  → DeepSeek
+      4. OPENAI_API_KEY / GPT_API_KEY → OpenAI
+      5. OPENROUTER_API_KEY → OpenRouter (generic fallback)
+      6. ANTHROPIC_API_KEY → OpenRouter (legacy alias)
     """
     openrouter_key = os.getenv("OPENROUTER_API_KEY")
     deepseek_key = os.getenv("DEEPSEEK_API_KEY")
     openai_key = os.getenv("OPENAI_API_KEY") or os.getenv("GPT_API_KEY")
     anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    sakana_key = os.getenv("SAKANA_API_KEY")
 
     # Route prefixed model names directly to OpenRouter
     _model = model or DEFAULT_MODEL
@@ -61,6 +64,13 @@ def _get_client(model: Optional[str] = None) -> OpenAI:
         _key = openrouter_key or anthropic_key or openai_key
         if _key:
             return OpenAI(api_key=_key, base_url="https://openrouter.ai/api/v1")
+
+    # Native Sakana AI routing. Do not silently fall back to another provider:
+    # if the user selected sakana/fuga, missing credentials must be explicit.
+    if _model and _model.startswith("sakana/"):
+        if sakana_key:
+            return OpenAI(api_key=sakana_key, base_url="https://api.sakana.ai/v1")
+        raise RuntimeError("SAKANA_API_KEY is required when using a sakana/* model.")
 
     if deepseek_key:
         return OpenAI(api_key=deepseek_key, base_url="https://api.deepseek.com/v1")
@@ -330,9 +340,15 @@ def run_agent(
                             model=model_name,
                             messages=messages,
                             temperature=0.5,  # Lower temp for refinement
-                            max_tokens=2000,
+                            max_tokens=8000,
+                            timeout=90,
                         )
-                        response_text = response.choices[0].message.content or ""
+                        candidate_text = response.choices[0].message.content or ""
+                        if candidate_text.strip():
+                            response_text = candidate_text
+                        else:
+                            logger.warning("Regeneration returned empty content; keeping best previous response")
+                            break
                     except Exception as e:
                         logger.warning(f"Regeneration LLM call failed: {e}")
                         break
@@ -469,7 +485,7 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                 timeout=60,
             )
         except Exception as e:
-            yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'content': str(e), 'session_id': session_id})}\n\n"
             return
 
         choice = response.choices[0]
@@ -552,17 +568,42 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
 
             # ── If streaming emitted tool call chunks, execute them now ──
             if pending_tool_chunks:
-                for ptc in pending_tool_chunks:
-                    tool_name = ptc["name"]
+                normalized_tool_calls = []
+                for idx, ptc in enumerate(pending_tool_chunks):
+                    call_id = ptc["id"] or f"inline_{idx}"
+                    normalized_tool_calls.append({
+                        "id": call_id,
+                        "type": "function",
+                        "function": {
+                            "name": ptc["name"],
+                            "arguments": ptc["args_buf"] or "{}",
+                        },
+                    })
+
+                # OpenAI-compatible chat requires every tool result to follow an
+                # assistant message containing the matching tool_calls list.
+                messages.append({
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": normalized_tool_calls,
+                })
+
+                for ptc, normalized in zip(pending_tool_chunks, normalized_tool_calls):
+                    tool_name = normalized["function"]["name"]
+                    args_buf = normalized["function"]["arguments"]
                     try:
-                        tool_args = json.loads(ptc["args_buf"]) if ptc["args_buf"] else {}
+                        tool_args = json.loads(args_buf) if args_buf else {}
                     except json.JSONDecodeError:
+                        logger.warning(f"Malformed streaming tool args for {tool_name}: {args_buf[:300]}")
                         tool_args = {}
-                    # Emit the tool event so frontend can open the canvas
+                    # Emit the tool event so frontend can react to tool execution
                     yield f"data: {json.dumps({'type': 'tool', 'name': tool_name, 'args': tool_args})}\n\n"
                     result = execute_tool(tool_name, tool_args)
                     tool_calls_made += 1
-                    messages.append({"role": "tool", "tool_call_id": ptc["id"] or "inline", "content": result})
+                    messages.append({"role": "tool", "tool_call_id": normalized["id"], "content": result})
+                # Send tool results back to the model. Without this loop-back,
+                # inline DSML/tool-call streams can finish with a blank answer.
+                continue
 
 
         except Exception as e:
@@ -576,25 +617,43 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                     max_tokens=8000,
                 )
                 fallback = response.choices[0].message.content or ""
-                streamed_parts.append(fallback)
-                yield f"data: {json.dumps({'type': 'token', 'content': fallback})}\n\n"
+                if fallback.strip():
+                    streamed_parts.append(fallback)
+                    yield f"data: {json.dumps({'type': 'token', 'content': fallback})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'error', 'content': 'Model returned empty response', 'session_id': session_id})}\n\n"
+                    return
             except Exception as e2:
-                yield f"data: {json.dumps({'type': 'error', 'content': str(e2)})}\n\n"
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e2), 'session_id': session_id})}\n\n"
                 return
 
         final_text = "".join(streamed_parts)
 
-        intelligence_notes = []
-        try:
-            from artimis.engine.intelligence import check_format
-            fmt = check_format(user_message, final_text)
-            if fmt:
-                for note in fmt.get("notes", []):
-                    intelligence_notes.append(f"[format] {note}")
-        except Exception:
-            pass
+        if not final_text.strip():
+            # Streaming can finish with no visible content when reasoning models
+            # spend the budget on reasoning or when DSML tokens were filtered.
+            # Retry once synchronously before emitting a terminal error.
+            try:
+                response = client.chat.completions.create(
+                    model=model_name,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=8000,
+                    timeout=90,
+                )
+                fallback = response.choices[0].message.content or ""
+                if fallback.strip():
+                    streamed_parts.append(fallback)
+                    final_text = fallback
+                    yield f"data: {json.dumps({'type': 'token', 'content': fallback})}\n\n"
+                else:
+                    yield f"data: {json.dumps({'type': 'error', 'content': 'Model returned empty response', 'session_id': session_id})}\n\n"
+                    return
+            except Exception as e:
+                yield f"data: {json.dumps({'type': 'error', 'content': str(e), 'session_id': session_id})}\n\n"
+                return
 
-        # ═══ INTELLIGENCE LAYER (parity with run_agent) ═══
+        # ═══ INTELLIGENCE LAYER (streaming post-check) ═══
         intelligence_notes = []
 
         # ═══ CURIOSITY ENGINE (parity with run_agent) ═══
@@ -682,4 +741,4 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
         yield f"data: {json.dumps(done_payload)}\n\n"
         return
 
-    yield f"data: {json.dumps({'type': 'error', 'content': 'Max iterations reached'})}\n\n"
+    yield f"data: {json.dumps({'type': 'error', 'content': 'Max iterations reached', 'session_id': session_id})}\n\n"

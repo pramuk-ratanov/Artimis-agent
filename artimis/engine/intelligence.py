@@ -437,8 +437,8 @@ def learn_from_critique(critique: dict, user_message: str, session_id: Optional[
         content = response.choices[0].message.content or "{}"
         content = content.strip()
         if content.startswith("```"):
-            lines = content.split("\\n")
-            content = "\\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
+            lines = content.split("\n")
+            content = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
         
         try:
             result = json.loads(content)
@@ -463,7 +463,7 @@ def learn_from_critique(critique: dict, user_message: str, session_id: Optional[
             current_content = row["content"]
             # Avoid exact duplicates
             if rule not in current_content:
-                new_content = current_content + f"\\n- **{topic.capitalize()}**: {rule}"
+                new_content = current_content + f"\n- **{topic.capitalize()}**: {rule}"
                 conn.execute(
                     "UPDATE skills SET content = ?, version = version + 1 WHERE name = ?",
                     (new_content, skill_name)
@@ -478,9 +478,9 @@ def learn_from_critique(critique: dict, user_message: str, session_id: Optional[
         else:
             # Create new ledger
             initial_content = (
-                "# Correction Ledger\\n\\n"
+                "# Correction Ledger\n\n"
                 "This skill contains generalized rules learned from past mistakes and critiques. "
-                "Always adhere to these rules when applicable:\\n\\n"
+                "Always adhere to these rules when applicable:\n\n"
                 f"- **{topic.capitalize()}**: {rule}"
             )
             create_skill(
@@ -501,14 +501,32 @@ def learn_from_critique(critique: dict, user_message: str, session_id: Optional[
 # AUTO-NAMING
 # ═══════════════════════════════════════════════════════════════
 
+def _safe_session_name(candidate_name: str | None, first_user_message: str | None) -> str:
+    """Return a non-empty, UI-safe session name.
+
+    Reasoning models can return an empty content field when max_tokens is too low
+    because the budget is spent on hidden reasoning. Empty names break the chat
+    sidebar, so every auto-name path must pass through this sanitizer.
+    """
+    name = (candidate_name or "").strip().strip('"').strip("'").strip(".").strip()
+    if not name:
+        name = (first_user_message or "").strip()
+    if not name:
+        name = "New Chat"
+    if len(name) > 60:
+        name = name[:57].rstrip() + "..."
+    return name
+
+
 def auto_name_session(session_id: str, first_user_message: str,
                       first_assistant_response: str) -> str:
-    """Generate a session name from the first exchange using an LLM."""
+    """Generate a non-empty session name from the first exchange."""
     from artimis.engine.agent import _get_client
     from artimis.db.manager import rename_session
 
     try:
         client = _get_client()
+        from artimis.engine.agent import DEFAULT_MODEL
         prompt = (
             "Generate a short, descriptive name (3-6 words max) for a conversation "
             "that starts with this exchange. Return ONLY the name, no quotes or punctuation.\n\n"
@@ -516,27 +534,18 @@ def auto_name_session(session_id: str, first_user_message: str,
             f"Assistant: {first_assistant_response[:200]}"
         )
         response = client.chat.completions.create(
-            model="deepseek-v4-pro",
+            model=DEFAULT_MODEL,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.5,
-            max_tokens=30,
+            temperature=0.3,
+            max_tokens=512,
+            timeout=45,
         )
-        name = response.choices[0].message.content
-        name = (name or "").strip().strip('"').strip("'").strip(".")
-
-        if len(name) > 60:
-            name = name[:57] + "..."
-
-        rename_session(session_id, name)
-        return name
-
+        name = _safe_session_name(response.choices[0].message.content, first_user_message)
     except Exception:
-        # Fallback: use first few words of user message
-        name = first_user_message[:50].strip()
-        if len(name) > 50:
-            name = name[:47] + "..."
-        rename_session(session_id, name)
-        return name
+        name = _safe_session_name("", first_user_message)
+
+    rename_session(session_id, name)
+    return name
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -568,7 +577,7 @@ def distill_session_context(session_id: str):
     # We want to summarize everything except the last 10 messages
     to_summarize = all_msgs[:-10]
     
-    text_to_summarize = "\\n".join([f"{m['role'].upper()}: {m['content'][:200]}" for m in to_summarize])
+    text_to_summarize = "\n".join([f"{m['role'].upper()}: {m['content'][:200]}" for m in to_summarize])
     existing_summary = session["summary"] or ""
     
     try:
@@ -576,12 +585,12 @@ def distill_session_context(session_id: str):
         prompt = (
             "Summarize the following conversation history into a concise list of key facts, "
             "established decisions, user constraints, and completed tasks. "
-            "This will serve as the persistent memory for the ongoing conversation.\\n\\n"
+            "This will serve as the persistent memory for the ongoing conversation.\n\n"
         )
         if existing_summary:
-            prompt += f"Previous summary:\\n{existing_summary}\\n\\n"
+            prompt += f"Previous summary:\n{existing_summary}\n\n"
             
-        prompt += f"New messages to incorporate:\\n{text_to_summarize}\\n\\n"
+        prompt += f"New messages to incorporate:\n{text_to_summarize}\n\n"
         prompt += "Return ONLY the compressed summary in bullet points, without introductory text."
         
         response = client.chat.completions.create(

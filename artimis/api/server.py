@@ -21,9 +21,29 @@ from artimis.db.schema import get_db, now as db_now
 
 app = FastAPI(title="Artimis Agent", version="0.1.0")
 
+
+def _get_allowed_origins() -> list[str]:
+    """Allowed browser origins for API access.
+
+    Defaults cover local development plus the current Tailscale-hosted Artimis UI.
+    Override with ARTIMIS_ALLOWED_ORIGINS as a comma-separated list if deploying
+    behind a different hostname.
+    """
+    configured = os.getenv("ARTIMIS_ALLOWED_ORIGINS", "")
+    if configured.strip():
+        return [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
+    return [
+        "http://localhost:7002",
+        "http://127.0.0.1:7002",
+        "http://100.95.117.9:7002",
+    ]
+
+
+_ALLOWED_ORIGINS = _get_allowed_origins()
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -37,6 +57,16 @@ async def api_key_auth_middleware(request: Request, call_next):
     """
     path = request.url.path
     if path.startswith("/api") and path != "/api/health":
+        # The config endpoint manages API keys/model routing. Even when ARTIMIS_API_KEY
+        # is not configured, reject browser calls from non-Artimis origins.
+        if path == "/api/config":
+            origin = request.headers.get("Origin")
+            if origin and origin.rstrip("/") not in _ALLOWED_ORIGINS:
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Origin not allowed for config access"},
+                )
+
         expected_key = os.getenv("ARTIMIS_API_KEY") or _read_env_file().get("ARTIMIS_API_KEY")
         
         if expected_key:
@@ -705,7 +735,7 @@ async def ingest_skill(req: IngestSkillRequest):
             # Attempt to parse name from frontmatter or filename path
             name = "ingested-skill"
             if "name:" in content[:500]:
-                for line in content[:500].split('\\n'):
+                for line in content[:500].split('\n'):
                     if line.startswith("name:"):
                         name = line.replace("name:", "").strip().strip('\'"')
                         break
@@ -725,6 +755,12 @@ async def ingest_skill(req: IngestSkillRequest):
                 
         return {"ingested": len(ingested), "skills": ingested}
 
+
+
+@app.get("/api/skills/relevant")
+async def get_relevant_skills(q: str):
+    from artimis.engine.brain import get_relevant_skills
+    return get_relevant_skills(q)
 
 
 @app.get("/api/skills/{skill_id}")
@@ -778,12 +814,6 @@ async def rollback_skill(skill_id: str, version: int):
     if not s:
         raise HTTPException(404, "Skill or version not found")
     return s
-
-
-@app.get("/api/skills/relevant")
-async def get_relevant_skills(q: str):
-    from artimis.engine.brain import get_relevant_skills
-    return get_relevant_skills(q)
 
 
 # ─── Cookbook Templates ────────────────────────────────────
@@ -937,6 +967,7 @@ _CONFIG_KEYS = [
     "GPT_API_KEY",
     "OPENROUTER_API_KEY",
     "ANTHROPIC_API_KEY",
+    "SAKANA_API_KEY",
 ]
 
 
@@ -983,6 +1014,7 @@ class ConfigRequest(BaseModel):
     GPT_API_KEY: Optional[str] = None
     OPENROUTER_API_KEY: Optional[str] = None
     ANTHROPIC_API_KEY: Optional[str] = None
+    SAKANA_API_KEY: Optional[str] = None
 
 
 @app.get("/api/config")
@@ -1212,22 +1244,21 @@ async def list_agents():
 
 @app.post("/api/agents")
 async def create_agent(req: Request):
-    db = get_db()
     body = await req.json()
     agent_id = str(uuid4())
-    db.execute(
-        "INSERT INTO custom_agents (id, name, description, model, api_key, system_prompt) VALUES (?,?,?,?,?,?)",
-        (agent_id, body["name"], body.get("description"), body["model"],
-         body.get("api_key"), body.get("system_prompt"))
-    )
-    conn.commit()
-    row = db.execute("SELECT * FROM custom_agents WHERE id=?", (agent_id,)).fetchone()
+    with closing(get_db()) as conn:
+        conn.execute(
+            "INSERT INTO custom_agents (id, name, description, model, api_key, system_prompt) VALUES (?,?,?,?,?,?)",
+            (agent_id, body["name"], body.get("description"), body["model"],
+             body.get("api_key"), body.get("system_prompt"))
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM custom_agents WHERE id=?", (agent_id,)).fetchone()
     return dict(row)
 
 
 @app.patch("/api/agents/{agent_id}")
 async def update_agent(agent_id: str, req: Request):
-    db = get_db()
     body = await req.json()
     fields = []
     values = []
@@ -1235,19 +1266,20 @@ async def update_agent(agent_id: str, req: Request):
         if k in body:
             fields.append(f"{k}=?")
             values.append(body[k])
-    if fields:
-        values.append(agent_id)
-        db.execute(f"UPDATE custom_agents SET {', '.join(fields)} WHERE id=?", tuple(values))
-        conn.commit()
-    row = db.execute("SELECT * FROM custom_agents WHERE id=?", (agent_id,)).fetchone()
+    with closing(get_db()) as conn:
+        if fields:
+            values.append(agent_id)
+            conn.execute(f"UPDATE custom_agents SET {', '.join(fields)} WHERE id=?", tuple(values))
+            conn.commit()
+        row = conn.execute("SELECT * FROM custom_agents WHERE id=?", (agent_id,)).fetchone()
     return dict(row) if row else JSONResponse(status_code=404, content={"error": "Not found"})
 
 
 @app.delete("/api/agents/{agent_id}")
 async def delete_agent(agent_id: str):
-    db = get_db()
-    db.execute("DELETE FROM custom_agents WHERE id=?", (agent_id,))
-    conn.commit()
+    with closing(get_db()) as conn:
+        conn.execute("DELETE FROM custom_agents WHERE id=?", (agent_id,))
+        conn.commit()
     return {"deleted": True}
 
 
