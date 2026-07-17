@@ -163,7 +163,7 @@ function ChatItem({
     >
       <div className={`sidebar-item flex items-center rounded-control font-sans
         ${isActive
-          ? "bg-surface-2 text-ink-primary border border-surface-3"
+          ? "bg-signal-500/10 text-ink-primary border border-signal-500/25"
           : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
         style={{
           "--pulse-duration": `${pulseDur}s`,
@@ -173,7 +173,7 @@ function ChatItem({
         {/* Main click area */}
         <button
           onClick={onSelect}
-          className="flex-1 text-left px-2 py-1 text-label truncate min-w-0"
+          className="flex-1 text-left px-2 py-1.5 text-body truncate min-w-0"
           title={isDraft ? "Draft chat — saved after first message" : (chat.name || "Empty Session")}
         >
           <span className={isDraft ? "text-ink-muted" : undefined}>{chat.name || "Empty Session"}</span>
@@ -222,13 +222,18 @@ export function ArtimisSidebar({
   }
 
   return (
-    <div className="w-[220px] h-full shrink-0 flex flex-col bg-surface-1 border-r border-surface-3 overflow-hidden">
+    <div className="w-[232px] h-full shrink-0 flex flex-col bg-surface-1 border-r border-surface-3 overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3.5 flex items-center gap-3 border-b border-surface-3 shrink-0">
         <LivingSignal state={signalState} />
-        <span className="text-body font-sans font-semibold tracking-tight text-ink-primary">
-          Artimis
-        </span>
+        <div className="flex flex-col">
+          <span className="text-body font-sans font-semibold tracking-tight text-ink-primary leading-tight">
+            Artimis
+          </span>
+          <span className="font-share text-[0.5625rem] uppercase tracking-[0.14em] text-ink-faint leading-tight">
+            Vital Signals
+          </span>
+        </div>
       </div>
 
       {/* Nav scroll */}
@@ -256,7 +261,7 @@ export function ArtimisSidebar({
         </div>
 
         {chatsOpen && (
-          <div className="ml-1.5 mt-0.5 space-y-0.5">
+          <div className="ml-1.5 mt-0.5 space-y-1">
             {unassigned.map(c => (
               <ChatItem
                 key={c.id}
@@ -331,7 +336,7 @@ export function ArtimisSidebar({
                 onClick={() => { onSelectTool(t.id); if (activeTool === t.id) onSelectTool("") }}
                 className={`sidebar-item w-full flex items-center gap-2 px-2 py-1 text-label rounded-control font-sans
                   ${activeTool === t.id
-                    ? "bg-surface-2 text-ink-primary border border-surface-3"
+                    ? "bg-signal-500/10 text-ink-primary border border-signal-500/25"
                     : "text-ink-secondary hover:bg-surface-2/40 hover:text-ink-primary border border-transparent"}`}
               >
                 <span className={activeTool === t.id ? "text-signal-400" : "text-ink-muted"}>
@@ -347,7 +352,7 @@ export function ArtimisSidebar({
       {/* Footer */}
       <div className="h-[42px] px-4 flex items-center justify-between border-t border-surface-3 shrink-0">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-full bg-ink-primary flex items-center justify-center text-caption font-semibold text-white font-sans">
+          <div className="w-5 h-5 rounded-full bg-signal-500/15 border border-signal-500/30 flex items-center justify-center text-caption font-semibold text-signal-400 font-sans">
             AD
           </div>
           <span className="text-label font-medium text-ink-secondary font-sans">admin</span>

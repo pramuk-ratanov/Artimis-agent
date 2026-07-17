@@ -132,19 +132,22 @@ function FileDrop({ onUploaded }: { onUploaded: (files: { id: string; original_n
 
   return (
     <div
-      className={`mb-2 rounded-control border border-dashed transition-all duration-150
-        ${dragOver ? "border-signal-400 bg-surface-2" : "border-surface-3 hover:border-surface-4"}`}
+      className="mb-2"
       onDragOver={e => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
       onDrop={handleDrop}
     >
-      <div className="flex items-center justify-between px-3 py-1.5">
-        <div className="flex items-center gap-2">
+      {dragOver ? (
+        <div className="rounded-control border border-dashed border-signal-400 bg-surface-2 px-3 py-2.5 text-center">
+          <span className="text-caption font-share text-signal-400">Drop files to upload</span>
+        </div>
+      ) : (
+        <div className="flex items-center gap-2 px-1">
           <button
             onClick={() => fileRef.current?.click()}
-            className="text-caption font-share text-ink-muted hover:text-signal-400 transition-colors cursor-pointer"
+            className="text-caption font-share text-ink-faint hover:text-signal-400 transition-colors cursor-pointer"
           >
-            {uploading ? "Uploading..." : dragOver ? "Drop files" : "+ Attach files"}
+            {uploading ? "Uploading..." : "+ Attach files"}
           </button>
           <input ref={fileRef} type="file" multiple className="hidden" onChange={handleFilePick} />
           {uploadedFiles.length > 0 && (
@@ -153,7 +156,7 @@ function FileDrop({ onUploaded }: { onUploaded: (files: { id: string; original_n
             </span>
           )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -433,16 +436,17 @@ export function ChatUI({
         </>
       )}
 
-      {/* Composer */}
+      {/* Composer — hidden on the empty home state; the hero input there is primary */}
+      {messages.length > 0 && (
       <div className="shrink-0 px-4 md:px-8 pb-6 pt-2">
         <div className="max-w-[72ch] mx-auto">
-          {/* File upload drop zone */}
+          {/* File upload — ghost attach, drop zone appears on drag */}
           <FileDrop onUploaded={(_files) => {
             // Files uploaded — agent can now reference them via read_uploaded_file
           }} />
-          <div className="flex items-stretch bg-surface-1 border border-surface-3 rounded-composer
-            overflow-hidden focus-within:border-signal-400
-            transition-colors duration-150 ease-expo-out">
+          <div className="vs-elevated flex items-stretch bg-surface-1 border border-surface-3 rounded-composer
+            overflow-hidden focus-within:border-signal-500/60 focus-within:shadow-[var(--shadow-signal-md)]
+            transition-all duration-200 ease-expo-out">
             <span className="flex items-center pl-3 pr-1.5 text-body font-mono text-signal-400 select-none">
               &gt;
             </span>
@@ -458,17 +462,14 @@ export function ChatUI({
               autoComplete="off"
               className="flex-1 bg-transparent border-none outline-none text-body text-ink-primary
                 font-sans placeholder:text-ink-muted py-2.5 px-1"
-              style={{ caretColor: "var(--color-signal-500)" }}
+              style={{ caretColor: "var(--color-signal-400)" }}
             />
             <SpotlightButton>
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || isLoading}
-                className={`px-4 text-label font-medium font-sans rounded-control transition-all duration-120 ease-expo-out
-                  active:scale-[0.97]
-                  ${input.trim() && !isLoading
-                    ? "bg-ink-primary text-white hover:bg-surface-5"
-                    : "bg-transparent text-ink-muted"}`}
+                className="btn-signal-primary m-1.5 px-5 text-label font-medium font-sans rounded-control transition-all duration-150 ease-expo-out
+                  active:scale-[0.97]"
               >
                 Send
               </button>
@@ -476,6 +477,7 @@ export function ChatUI({
           </div>
         </div>
       </div>
+      )}
     </div>
   )
 }
