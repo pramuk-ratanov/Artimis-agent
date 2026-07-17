@@ -6,6 +6,7 @@
 
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -64,7 +65,7 @@
 
   /* ── Fonts (sans-serif body, mono for UI, mono for code) ── */
   --font-share: "Share Tech Mono", monospace;
-  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif;
+  --font-sans: "Geist Variable", -apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
 
   /* ── Type scale ── */
@@ -82,6 +83,70 @@
 
   /* ── Easing ── */
   --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ═══════════════════════════════════════════════════════
+   Light theme — Peec-style warm off-white.
+   Same token names; the alias layer (@theme inline) follows.
+   Signal/ember deepen slightly for contrast on light surfaces.
+   ═══════════════════════════════════════════════════════ */
+
+html[data-theme="light"] {
+  /* Signal — same hue family, deepened for white backgrounds */
+  --color-signal-200: oklch(0.72 0.06 230);
+  --color-signal-300: oklch(0.62 0.08 230);
+  --color-signal-400: oklch(0.52 0.10 230);
+  --color-signal-500: oklch(0.44 0.10 230);
+  --color-signal-600: oklch(0.36 0.09 230);
+  --color-signal-700: oklch(0.30 0.07 230);
+
+  /* Ember — warm counter-pole, deepened */
+  --color-ember-200: oklch(0.72 0.08 65);
+  --color-ember-300: oklch(0.64 0.10 62);
+  --color-ember-400: oklch(0.56 0.12 60);
+  --color-ember-500: oklch(0.50 0.12 58);
+  --color-ember-600: oklch(0.42 0.10 56);
+  --color-ember-700: oklch(0.34 0.08 55);
+
+  /* Surfaces — warm off-white → elevated */
+  --color-surface-0: oklch(0.985 0.002 60);
+  --color-surface-1: oklch(0.965 0.003 60);
+  --color-surface-2: oklch(0.935 0.003 60);
+  --color-surface-3: oklch(0.885 0.003 60);
+  --color-surface-4: oklch(0.835 0.003 60);
+  --color-surface-5: oklch(0.785 0.003 60);
+
+  /* Ink — warm near-black text */
+  --color-ink-primary: oklch(0.20 0.002 60);
+  --color-ink-secondary: oklch(0.40 0.002 60);
+  --color-ink-muted: oklch(0.55 0.002 60);
+  --color-ink-faint: oklch(0.70 0.002 60);
+
+  /* Status — deepened for light bg */
+  --color-ok: oklch(0.50 0.12 145);
+  --color-warn: oklch(0.55 0.12 75);
+  --color-error: oklch(0.48 0.14 20);
+
+  /* Pastel accents — light tint bg, deep text */
+  --color-accent-red-bg: oklch(0.93 0.02 20);
+  --color-accent-red-text: oklch(0.45 0.10 20);
+  --color-accent-blue-bg: oklch(0.93 0.02 230);
+  --color-accent-blue-text: oklch(0.42 0.09 230);
+  --color-accent-green-bg: oklch(0.93 0.02 140);
+  --color-accent-green-text: oklch(0.42 0.09 140);
+  --color-accent-yellow-bg: oklch(0.93 0.02 90);
+  --color-accent-yellow-text: oklch(0.45 0.09 90);
+}
+
+/* Light theme: soften the horizon glow to a pale blue wash */
+html[data-theme="light"] .dark-horizon-glow {
+  background: radial-gradient(125% 125% at 50% 90%, oklch(0.97 0.005 60) 40%, oklch(0.90 0.03 230) 100%);
+}
+
+/* Light theme: chat bubbles + code blocks keep hairline contrast */
+html[data-theme="light"] pre,
+html[data-theme="light"] code {
+  color-scheme: light;
 }
 
 /* ═══════════════════════════════════════════════════════

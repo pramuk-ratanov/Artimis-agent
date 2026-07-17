@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from "react"
 import {
   CaretDown, CaretRight, Brain, ImageSquare, Note,
   CheckSquare, Wrench, Database, Palette, Gear, Compass,
-  Archive, Trash, DotsThree, ChartBar, Plus,
+  Archive, Trash, DotsThree, ChartBar, Plus, Flask,
 } from "@phosphor-icons/react"
 import { LivingSignal, type SignalState } from "@/components/living-signal"
 
@@ -20,7 +20,7 @@ const TOOLS = [
   { id: "tasks", label: "Tasks", icon: <CheckSquare size={14} weight="regular" /> },
   { id: "skills", label: "Skills", icon: <Wrench size={14} weight="regular" /> },
   { id: "statistics", label: "Statistics", icon: <ChartBar size={14} weight="regular" /> },
-  { id: "harness-lab", label: "Harness Lab", icon: <Wrench size={14} weight="regular" /> },
+  { id: "harness-lab", label: "Harness Lab", icon: <Flask size={14} weight="regular" /> },
   { id: "theme", label: "Theme", icon: <Palette size={14} weight="regular" /> },
 ]
 

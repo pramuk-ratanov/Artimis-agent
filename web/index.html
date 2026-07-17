@@ -7,6 +7,16 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+    <script>
+      // Apply saved theme before first paint to avoid a flash of the wrong theme.
+      (function () {
+        try {
+          var q = new URLSearchParams(location.search).get("theme");
+          var t = (q === "light" || q === "dark") ? q : localStorage.getItem("artimis-theme");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

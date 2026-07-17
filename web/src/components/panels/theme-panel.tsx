@@ -1,7 +1,27 @@
 "use client"
 
+import { useEffect, useState } from "react"
+
+type Theme = "dark" | "light"
+
+function getInitialTheme(): Theme {
+  if (typeof document === "undefined") return "dark"
+  const current = document.documentElement.getAttribute("data-theme")
+  return current === "light" ? "light" : "dark"
+}
+
 export function ThemePanel() {
-  const swatches = ["#0a0b0d", "#111318", "#181c22", "#1e232c", "#252b36", "#2d3341"]
+  const [theme, setTheme] = useState<Theme>(getInitialTheme)
+
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme)
+    try {
+      localStorage.setItem("artimis-theme", theme)
+    } catch {}
+  }, [theme])
+
+  const darkSwatches = ["#0a0b0d", "#111318", "#181c22", "#1e232c", "#252b36", "#2d3341"]
+  const lightSwatches = ["#faf9f7", "#f4f2ef", "#ece9e4", "#dfdbd4", "#d0ccc4", "#c2beb6"]
   const signalSwatches = ["#7dd3fc", "#38bdf8", "#0ea5e9", "#0284c7", "#0369a1"]
 
   return (
@@ -9,16 +29,47 @@ export function ThemePanel() {
       <div className="max-w-[65ch] mx-auto">
         <h2 className="text-heading font-semibold text-ink-primary mb-1">Theme</h2>
         <p className="text-body text-ink-secondary mb-6">
-          Charcoal surfaces + sky-blue signal. Vital Signals DNA. This is the only theme.
+          Charcoal surfaces + sky-blue signal by default. Light theme uses warm off-white
+          surfaces with the same signal DNA.
         </p>
 
-        <div className="mb-6">
-          <p className="text-label text-ink-muted mb-2">SURFACES</p>
+        <div className="mb-8">
+          <p className="text-label text-ink-muted mb-2">MODE</p>
           <div className="flex gap-2">
-            {swatches.map(c => (
+            {(["dark", "light"] as Theme[]).map(t => (
+              <button
+                key={t}
+                onClick={() => setTheme(t)}
+                className={`px-4 py-2 rounded-control border text-label font-share transition-colors duration-150
+                  ${theme === t
+                    ? "border-signal-500 bg-surface-2 text-ink-primary"
+                    : "border-surface-3 bg-surface-1 text-ink-secondary hover:bg-surface-2"}`}
+              >
+                {t === "dark" ? "Dark — Charcoal" : "Light — Peec"}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-label text-ink-muted mb-2">SURFACES — DARK</p>
+          <div className="flex gap-2">
+            {darkSwatches.map(c => (
               <div key={c} className="flex-1 aspect-square rounded-card border border-surface-3 flex items-end justify-center p-1"
                 style={{ background: c }}>
-                <span className="text-[0.5rem] font-mono text-ink-faint">{c}</span>
+                <span className="text-[0.5rem] font-mono text-white/40">{c}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mb-6">
+          <p className="text-label text-ink-muted mb-2">SURFACES — LIGHT</p>
+          <div className="flex gap-2">
+            {lightSwatches.map(c => (
+              <div key={c} className="flex-1 aspect-square rounded-card border border-surface-3 flex items-end justify-center p-1"
+                style={{ background: c }}>
+                <span className="text-[0.5rem] font-mono text-black/40">{c}</span>
               </div>
             ))}
           </div>
@@ -41,7 +92,7 @@ export function ThemePanel() {
           <p className="text-display font-semibold text-ink-primary mb-1 heading-default">Display</p>
           <p className="text-heading font-semibold text-ink-primary mb-1">Heading</p>
           <p className="text-body text-ink-primary mb-1">Body — Share Tech Mono</p>
-          <p className="text-body text-ink-primary mb-1" style={{ fontFamily: "var(--font-sans)" }}>Body — System Sans</p>
+          <p className="text-body text-ink-primary mb-1" style={{ fontFamily: "var(--font-sans)" }}>Body — Geist Sans</p>
           <p className="text-label text-ink-secondary mb-1 font-semibold">LABEL</p>
           <p className="text-caption text-ink-muted">caption</p>
           <p className="text-code font-mono text-ink-secondary mt-1">mono code</p>
