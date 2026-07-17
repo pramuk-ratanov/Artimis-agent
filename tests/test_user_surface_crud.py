@@ -14,6 +14,10 @@ def _isolated_app(monkeypatch, tmp_path):
 
     monkeypatch.setattr(schema, "DB_PATH", str(tmp_path / "artimis.db"))
     monkeypatch.setattr(server, "_FILES_DIR", str(tmp_path / "files"))
+    # Keep CRUD tests hermetic: no auth env leakage from the real ~/.artimis/.env.
+    # Auth behavior itself is covered in test_api_security_middleware.py.
+    monkeypatch.delenv("ARTIMIS_API_KEY", raising=False)
+    monkeypatch.setattr(server, "_read_env_file", lambda: {})
     schema.init_db()
     return server.app
 

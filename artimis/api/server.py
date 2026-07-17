@@ -22,6 +22,39 @@ from artimis.db.schema import get_db, now as db_now
 app = FastAPI(title="Artimis Agent", version="0.1.0")
 
 
+def _maybe_auto_name_background(session_id: str) -> None:
+    """Auto-name a session after its first exchange, in a background thread.
+
+    The frontend calls /api/sessions/{id}/auto-name explicitly, but sessions
+    created via API (curl, scripts, other agents) never get named and pile up
+    as "New Chat". This fires only when the session is still unnamed and has
+    exactly one exchange, and never overwrites a name that already exists.
+    """
+    import threading
+
+    def _run() -> None:
+        try:
+            session = db.get_session(session_id)
+            if not session:
+                return
+            current = (session.get("name") or "").strip()
+            if current and current != "New Chat":
+                return
+            messages = db.get_messages(session_id, limit=3)
+            if len(messages) != 2:
+                return  # only name right after the first exchange
+            user_msg = next((m["content"] for m in messages if m["role"] == "user"), "")
+            asst_msg = next((m["content"] for m in messages if m["role"] == "assistant"), "")
+            if not user_msg or not asst_msg:
+                return
+            from artimis.engine.intelligence import auto_name_session
+            auto_name_session(session_id, user_msg, asst_msg)
+        except Exception:
+            pass  # naming is best-effort; never break the response path
+
+    threading.Thread(target=_run, daemon=True).start()
+
+
 def _get_allowed_origins() -> list[str]:
     """Allowed browser origins for API access.
 
@@ -335,6 +368,7 @@ async def send_message(session_id: str, req: SendMessageRequest):
 
     # Save assistant response
     db.add_message(session_id, "assistant", response_content)
+    _maybe_auto_name_background(session_id)
 
     return {
         "session_id": session_id,
@@ -453,11 +487,12 @@ async def agent_stream_endpoint(req: AgentRequest):
             complete = "".join(full_response)
             if complete or tool_calls:
                 db.add_message(
-                    session_id, 
-                    "assistant", 
+                    session_id,
+                    "assistant",
                     complete if complete else None,
                     tool_calls=tool_calls if tool_calls else None
                 )
+                _maybe_auto_name_background(session_id)
 
         except Exception as e:
             yield f"data: {json.dumps({'type': 'error', 'content': str(e)})}\n\n"
