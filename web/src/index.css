@@ -197,6 +197,13 @@ html[data-theme="light"] code {
   --radius-sm: 4px;
   --radius-md: var(--radius-card);
   --radius-lg: var(--radius-composer);
+
+  /* ── Chart palette (VS data-viz: pastel signal family + ember counterpoint) ── */
+  --chart-1: var(--color-signal-400);
+  --chart-2: var(--color-ember-400);
+  --chart-3: var(--color-ok);
+  --chart-4: var(--color-warn);
+  --chart-5: var(--color-error);
 }
 
 /* ═══════════════════════════════════════════════════════
