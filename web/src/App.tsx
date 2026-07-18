@@ -378,12 +378,12 @@ function App() {
               onClick={() => setNotificationCount(0)}
             >
               <Bell size={14} weight={notificationCount > 0 ? "fill" : "regular"} />
-              {notificationCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 flex items-center justify-center
-                  rounded-full bg-signal-600 text-[0.5rem] font-bold text-ink-primary">
+              <span className="t-badge" data-open={notificationCount > 0}>
+                <span className="t-badge-dot w-4 h-4 flex items-center justify-center
+                  rounded-full bg-signal-600 text-[0.5rem] font-bold text-white">
                   {notificationCount > 9 ? "9+" : notificationCount}
                 </span>
-              )}
+              </span>
             </button>
 
             {/* Offline banner */}

@@ -6,6 +6,7 @@ interface ToastItem {
   id: string
   message: string
   type: "success" | "error" | "info"
+  open: boolean
 }
 
 interface ToastContextType {
@@ -23,7 +24,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
     const id = Math.random().toString(36).slice(2)
-    setToasts(prev => [...prev, { id, message, type }])
+    setToasts(prev => [...prev, { id, message, type, open: false }])
+    // Next frame: flip to open so the t-toast open clock plays
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setToasts(prev => prev.map(t => t.id === id ? { ...t, open: true } : t))
+      })
+    })
+    // Dismiss on the fast close clock, then remove
+    setTimeout(() => {
+      setToasts(prev => prev.map(t => t.id === id ? { ...t, open: false } : t))
+    }, 3200)
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
     }, 3500)
@@ -36,7 +47,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map(t => (
           <div
             key={t.id}
-            className="pointer-events-auto animate-toast-in flex items-center gap-2 px-4 py-2.5 rounded-card border border-surface-3 bg-surface-1 font-sans text-label text-ink-primary shadow-sm"
+            className={`t-toast ${t.open ? "is-open" : ""} pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-card border border-surface-3 bg-surface-1 font-sans text-label text-ink-primary shadow-sm`}
           >
             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.type === "success" ? "bg-signal-400" : t.type === "error" ? "bg-error" : "bg-ink-faint"}`} />
             {t.message}
