@@ -45,7 +45,7 @@ export function ThemePanel() {
                     ? "border-signal-500 bg-surface-2 text-ink-primary"
                     : "border-surface-3 bg-surface-1 text-ink-secondary hover:bg-surface-2"}`}
               >
-                {t === "dark" ? "Dark" : "Light — default (peec paper)"}
+                {t === "dark" ? "Dark" : "Light (default, peec paper)"}
               </button>
             ))}
           </div>
@@ -91,8 +91,8 @@ export function ThemePanel() {
           <p className="text-label text-ink-muted mb-2">TYPOGRAPHY</p>
           <p className="text-display font-semibold text-ink-primary mb-1 heading-default">Display</p>
           <p className="text-heading font-semibold text-ink-primary mb-1">Heading</p>
-          <p className="text-body text-ink-primary mb-1">Body — Geist Mono Variable</p>
-          <p className="text-body text-ink-primary mb-1" style={{ fontFamily: "var(--font-sans)" }}>Body — Geist Sans</p>
+          <p className="text-body text-ink-primary mb-1">Body (Geist Mono Variable)</p>
+          <p className="text-body text-ink-primary mb-1" style={{ fontFamily: "var(--font-sans)" }}>Body (Geist Sans)</p>
           <p className="text-label text-ink-secondary mb-1 font-semibold">LABEL</p>
           <p className="text-caption text-ink-muted">caption</p>
           <p className="text-code font-mono text-ink-secondary mt-1">mono code</p>

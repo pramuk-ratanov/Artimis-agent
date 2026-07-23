@@ -1,8 +1,10 @@
 "use client"
 
 import { useEffect, useState, useCallback } from "react"
+import { PushPin, Trash } from "@phosphor-icons/react"
 import * as api from "@/lib/api"
 import type { Memory } from "@/lib/api"
+import { PanelEmpty, PanelError, PanelLoading, PanelShell, requestError } from "@/components/ui/panel-state"
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -36,7 +38,9 @@ interface TagPillProps {
 function TagPill({ label, active, onClick }: TagPillProps) {
   return (
     <button
+      type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={[
         "shrink-0 px-2.5 py-0.5 rounded-control border text-caption font-share transition-colors duration-150 cursor-pointer",
         active
@@ -59,6 +63,8 @@ function Toggle({ checked, onChange, disabled }: ToggleProps) {
   return (
     <button
       role="switch"
+      type="button"
+      aria-label="Memory active"
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
@@ -162,18 +168,20 @@ function MemoryCard({
         <div className="flex items-center gap-2 shrink-0">
           {/* Pin button */}
           <button
+            type="button"
             onClick={() => onPin(m.id)}
             disabled={pinLoading}
-            title={m.pinned ? "Unpin" : "Pin"}
+            aria-label={m.pinned ? "Unpin memory" : "Pin memory"}
             className={[
-              "text-caption font-share px-1.5 py-0.5 rounded-control border transition-colors duration-150",
+              "inline-flex items-center gap-1 text-caption font-share px-1.5 py-0.5 rounded-control border transition-colors duration-150",
               m.pinned
                 ? "text-signal-400 border-signal-600 bg-surface-2 hover:bg-surface-3"
                 : "text-ink-faint border-surface-3 bg-surface-1 hover:text-ink-muted hover:border-surface-4",
               pinLoading ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
             ].join(" ")}
           >
-            {m.pinned ? "★ pinned" : "☆ pin"}
+            <PushPin size={14} weight={m.pinned ? "fill" : "regular"} aria-hidden="true" />
+            {m.pinned ? "Pinned" : "Pin"}
           </button>
 
           {/* Active toggle */}
@@ -187,12 +195,14 @@ function MemoryCard({
           {confirmDelete ? (
             <div className="flex items-center gap-1">
               <button
+                type="button"
                 onClick={() => onDelete(m.id)}
                 className="text-caption text-error border border-error px-1.5 py-0.5 rounded-control font-share cursor-pointer hover:bg-surface-2 transition-colors duration-150"
               >
                 confirm
               </button>
               <button
+                type="button"
                 onClick={() => setConfirmDelete(false)}
                 className="text-caption text-ink-muted border border-surface-3 px-1.5 py-0.5 rounded-control font-share cursor-pointer hover:bg-surface-2 transition-colors duration-150"
               >
@@ -201,11 +211,12 @@ function MemoryCard({
             </div>
           ) : (
             <button
+              type="button"
               onClick={() => setConfirmDelete(true)}
-              title="Delete"
+              aria-label="Delete memory"
               className="text-caption text-ink-faint font-share border border-surface-3 px-1.5 py-0.5 rounded-control cursor-pointer hover:text-error hover:border-error transition-colors duration-150"
             >
-              ✕
+              <Trash size={14} aria-hidden="true" />
             </button>
           )}
         </div>
@@ -289,6 +300,7 @@ export function MemoriesPanel() {
   const [search, setSearch] = useState("")
   const [activeTag, setActiveTag] = useState<string>(ALL_TAG)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [showAdd, setShowAdd] = useState(false)
   const [pinLoadingIds, setPinLoadingIds] = useState<Set<string>>(new Set())
   const [activeLoadingIds, setActiveLoadingIds] = useState<Set<string>>(new Set())
@@ -303,12 +315,13 @@ export function MemoriesPanel() {
 
   const fetchMemories = useCallback((s?: string, tag?: string) => {
     setLoading(true)
+    setError(null)
     const params: Parameters<typeof api.getMemories>[0] = {}
     if (s) params.search = s
     if (tag && tag !== ALL_TAG) params.tag = tag
     api.getMemories(params)
       .then(setMemories)
-      .catch(() => {})
+      .catch((cause) => setError(requestError(cause)))
       .finally(() => setLoading(false))
   }, [])
 
@@ -331,8 +344,8 @@ export function MemoriesPanel() {
     try {
       const updated = await api.toggleMemoryPin(id)
       setMemories(prev => prev.map(m => m.id === id ? updated : m))
-    } catch {
-      // silent
+    } catch (cause) {
+      setError(requestError(cause))
     } finally {
       setPinLoadingIds(prev => { const s = new Set(prev); s.delete(id); return s })
     }
@@ -343,8 +356,8 @@ export function MemoriesPanel() {
     try {
       const updated = await api.updateMemory(id, { active } as Parameters<typeof api.updateMemory>[1] & { active?: boolean })
       setMemories(prev => prev.map(m => m.id === id ? updated : m))
-    } catch {
-      // silent
+    } catch (cause) {
+      setError(requestError(cause))
     } finally {
       setActiveLoadingIds(prev => { const s = new Set(prev); s.delete(id); return s })
     }
@@ -354,8 +367,8 @@ export function MemoriesPanel() {
     try {
       await api.deleteMemory(id)
       setMemories(prev => prev.filter(m => m.id !== id))
-    } catch {
-      // silent
+    } catch (cause) {
+      setError(requestError(cause))
     }
   }
 
@@ -372,38 +385,34 @@ export function MemoriesPanel() {
   })
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 font-sans">
-      <div className="max-w-4xl mx-auto space-y-4">
-
-        {/* ── Header ── */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <h2 className="text-heading font-sans text-ink-primary">
-              Memories
-            </h2>
-            <span className="text-caption text-ink-muted bg-surface-2 border border-surface-3 px-2 py-0.5 rounded-control font-share">
-              {memories.length} {memories.length === 1 ? "memory" : "memories"}
-            </span>
-          </div>
-          <button
-            onClick={() => setShowAdd(v => !v)}
-            className="text-label font-share px-3 py-1 rounded-control bg-surface-2 text-ink-secondary border border-surface-3 hover:bg-surface-3 hover:text-ink-primary transition-colors duration-150 cursor-pointer"
-          >
-            + Add
+    <PanelShell
+      title="Memories"
+      description="Facts, preferences, and project context the agent can reuse."
+      action={
+        <div className="flex items-center gap-3">
+          <span className="text-caption text-ink-muted font-share" aria-live="polite">
+            {memories.length} {memories.length === 1 ? "memory" : "memories"}
+          </span>
+          <button type="button" onClick={() => setShowAdd(v => !v)} className="btn-secondary">
+            Add memory
           </button>
         </div>
+      }
+    >
+      <div className="space-y-4">
+        <div>
+          <label className="field-label" htmlFor="memory-search">Search memories</label>
+          <input
+            id="memory-search"
+            type="search"
+            value={search}
+            onChange={e => handleSearch(e.target.value)}
+            placeholder="Search by content or tag"
+            className="field-control"
+          />
+        </div>
 
-        {/* ── Search ── */}
-        <input
-          type="text"
-          value={search}
-          onChange={e => handleSearch(e.target.value)}
-          placeholder="Search memories…"
-          className="w-full bg-surface-1 border border-surface-3 rounded-control px-3 py-2 text-body text-ink-primary font-sans outline-none placeholder:text-ink-faint focus:border-signal-500 transition-colors duration-150"
-        />
-
-        {/* ── Tag filter pills ── */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none" aria-label="Filter memories by tag">
           {filterTags.map(tag => (
             <TagPill
               key={tag}
@@ -414,7 +423,6 @@ export function MemoriesPanel() {
           ))}
         </div>
 
-        {/* ── Inline add form ── */}
         {showAdd && (
           <AddForm
             onAdd={handleAdd}
@@ -422,15 +430,17 @@ export function MemoriesPanel() {
           />
         )}
 
-        {/* ── Memory list ── */}
         {loading ? (
-          <p className="text-label text-ink-muted font-sans">Loading…</p>
+          <PanelLoading label="Loading memories" />
+        ) : error ? (
+          <PanelError message={error} onRetry={() => fetchMemories(search || undefined, activeTag !== ALL_TAG ? activeTag : undefined)} />
         ) : sorted.length === 0 ? (
-          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted font-sans">
-            {search || activeTag !== ALL_TAG
-              ? "No memories match your filter."
-              : "No memories yet. They accumulate as you talk with the agent."}
-          </div>
+          <PanelEmpty
+            title={search || activeTag !== ALL_TAG ? "No matching memories" : "No memories yet"}
+            description={search || activeTag !== ALL_TAG
+              ? "Change the search text or select another tag."
+              : "Memories accumulate as you work with the agent, or you can add one manually."}
+          />
         ) : (
           <div className="space-y-2">
             {sorted.map(m => (
@@ -447,6 +457,6 @@ export function MemoriesPanel() {
           </div>
         )}
       </div>
-    </div>
+    </PanelShell>
   )
 }

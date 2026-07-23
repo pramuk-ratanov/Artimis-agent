@@ -3,44 +3,41 @@
 import { useEffect, useState } from "react"
 import * as api from "@/lib/api"
 import type { Task } from "@/lib/api"
-
-const STATUS_COLORS: Record<string, string> = {
-  pending: "text-ink-muted",
-  in_progress: "text-signal-400",
-  paused: "text-warn",
-  completed: "text-ok",
-  cancelled: "text-error",
-}
+import { PanelEmpty, PanelError, PanelLoading, PanelShell, StatusText, formatTimestamp, requestError } from "@/components/ui/panel-state"
 
 export function TasksPanel() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchTasks = () => {
-    api.getTasks().then(setTasks).catch(() => {}).finally(() => setLoading(false))
+    setLoading(true)
+    setError(null)
+    api.getTasks()
+      .then(setTasks)
+      .catch((cause) => setError(requestError(cause)))
+      .finally(() => setLoading(false))
   }
 
   useEffect(() => { fetchTasks() }, [])
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 font-share">
-      <div className="max-w-4xl mx-auto">
-        <h2 className="text-heading font-semibold text-ink-primary mb-1">Tasks</h2>
-        <p className="text-body text-ink-secondary mb-6">
-          Background task execution. Multi-phase pipeline with pause and resume.
-        </p>
+    <PanelShell
+      title="Tasks"
+      description="Background task execution with pause and resume."
+    >
         {loading ? (
-          <p className="text-label text-ink-muted italic">Loading…</p>
+          <PanelLoading label="Loading tasks" />
+        ) : error ? (
+          <PanelError message={error} onRetry={fetchTasks} />
         ) : tasks.length === 0 ? (
-          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted">
-            No tasks. Submit one via the agent or API.
-          </div>
+          <PanelEmpty title="No tasks" description="Ask the agent to create a background task, or submit one through the API." />
         ) : (
-          <div className="space-y-2">
+          <div className="data-list">
             {tasks.map(t => (
-              <div key={t.id} className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-3">
+              <article key={t.id} className="data-row">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-body font-semibold text-ink-primary">{t.title}</p>
                     {t.description && (
                       <p className="text-label text-ink-secondary mt-0.5">
@@ -48,20 +45,17 @@ export function TasksPanel() {
                       </p>
                     )}
                   </div>
-                  <span className={`text-caption font-semibold shrink-0 ${STATUS_COLORS[t.status]}`}>
-                    {t.status.replace("_", " ")}
-                  </span>
+                  <StatusText value={t.status} />
                 </div>
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
                   <span className="text-caption text-ink-muted">Phase: {t.phase}</span>
                   <span className="text-caption text-ink-muted">Priority: {t.priority}</span>
-                  <span className="text-caption text-ink-faint ml-auto">{t.created_at}</span>
+                  <time className="text-caption text-ink-faint sm:ml-auto" dateTime={t.created_at}>{formatTimestamp(t.created_at)}</time>
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
-      </div>
-    </div>
+    </PanelShell>
   )
 }

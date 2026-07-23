@@ -106,32 +106,34 @@ root.render(<App />);`,
 
   if (!extracted || !sandpackFiles) {
     return (
-      <div className="w-1/2 min-w-[400px] h-full flex flex-col border-l border-surface-2 bg-surface-0 shadow-lg">
-        <div className="h-14 min-h-[56px] border-b border-surface-2 flex items-center justify-between px-4 bg-surface-1">
+      <aside className="w-full lg:w-1/2 min-w-0 h-full flex-none flex flex-col border-l border-surface-2 bg-surface-0" aria-label="Canvas">
+        <div className="h-12 min-h-12 border-b border-surface-2 flex items-center justify-between px-3 sm:px-4 bg-surface-1">
           <h2 className="text-body font-medium text-ink-primary truncate">{title}</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-control hover:bg-surface-2 text-ink-muted hover:text-warn transition-colors">
+          <button type="button" onClick={onClose} className="btn-ghost !min-h-8 !px-2" aria-label="Close canvas">
             <X size={18} />
           </button>
         </div>
-        <div className="flex-1 overflow-hidden bg-[#F8FAFC]">
-          <div className="w-full h-full p-6 overflow-y-auto">
+        <div className="flex-1 overflow-hidden bg-surface-0">
+          <div className="w-full h-full p-4 sm:p-6 overflow-y-auto">
             <pre className="whitespace-pre-wrap text-[13px] font-share text-ink-secondary leading-relaxed">{content}</pre>
           </div>
         </div>
-      </div>
+      </aside>
     )
   }
 
   return (
-    <div className="w-1/2 min-w-[400px] h-full flex flex-col border-l border-surface-2 bg-surface-0 shadow-lg">
+    <aside className="w-full lg:w-1/2 min-w-0 h-full flex-none flex flex-col border-l border-surface-2 bg-surface-0" aria-label="Canvas">
       {/* Header */}
-      <div className="h-14 min-h-[56px] border-b border-surface-2 flex items-center justify-between px-4 bg-surface-1">
+      <div className="min-h-12 border-b border-surface-2 flex flex-wrap items-center justify-between gap-2 px-3 py-2 sm:px-4 bg-surface-1">
         <h2 className="text-body font-medium text-ink-primary truncate">{title}</h2>
 
         <div className="flex items-center gap-2">
-          <div className="flex bg-surface-2 rounded-control p-0.5">
+          <div className="flex bg-surface-2 rounded-control p-0.5" role="group" aria-label="Canvas view">
             <button
+              type="button"
               onClick={() => setViewMode("preview")}
+              aria-pressed={viewMode === "preview"}
               className={
                 viewMode === "preview"
                   ? "px-3 py-1 rounded text-caption font-medium transition-colors bg-surface-0 text-signal-400 shadow-sm"
@@ -141,7 +143,9 @@ root.render(<App />);`,
               <Play size={14} className="inline mr-1" /> Preview
             </button>
             <button
+              type="button"
               onClick={() => setViewMode("code")}
+              aria-pressed={viewMode === "code"}
               className={
                 viewMode === "code"
                   ? "px-3 py-1 rounded text-caption font-medium transition-colors bg-surface-0 text-signal-400 shadow-sm"
@@ -153,16 +157,18 @@ root.render(<App />);`,
           </div>
 
           <button
+            type="button"
             onClick={handleCopy}
             className="w-8 h-8 flex items-center justify-center rounded-control hover:bg-surface-2 text-ink-muted hover:text-ink-primary transition-colors ml-2"
-            title="Copy code"
+            aria-label="Copy code"
           >
             {copied ? <Check size={18} className="text-signal-success" /> : <Copy size={18} />}
           </button>
           <button
+            type="button"
             onClick={onClose}
             className="w-8 h-8 flex items-center justify-center rounded-control hover:bg-surface-2 text-ink-muted hover:text-warn transition-colors"
-            title="Close Canvas"
+            aria-label="Close canvas"
           >
             <X size={18} />
           </button>
@@ -199,6 +205,6 @@ root.render(<App />);`,
           </SandpackLayout>
         </SandpackProvider>
       </div>
-    </div>
+    </aside>
   )
 }

@@ -80,10 +80,10 @@
   --font-size-caption: 0.625rem;
   --font-size-code: 0.71875rem;
 
-  /* ── Radii (VS-sharp lineage, softened one step for app surfaces) ── */
-  --radius-control: 6px;
-  --radius-card: 10px;
-  --radius-composer: 12px;
+  /* ── Radii (Forge-machined: tight, consistent, no decorative pills) ── */
+  --radius-control: 4px;
+  --radius-card: 4px;
+  --radius-composer: 4px;
 
   /* ── Easing (VS panel ease) ── */
   --ease-expo-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -330,6 +330,241 @@ body {
 .rounded-composer { border-radius: var(--radius-composer); }
 
 .ease-expo-out { transition-timing-function: var(--ease-expo-out); }
+
+/* ═══════════════════════════════════════════════════════
+   Forge x Artimis product primitives
+   ═══════════════════════════════════════════════════════ */
+
+.panel-shell {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 32px 40px 48px;
+  font-family: var(--font-sans);
+}
+
+.panel-shell-inner {
+  width: 100%;
+  margin-inline: auto;
+}
+
+.panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--color-surface-3);
+}
+
+.panel-title {
+  color: var(--color-ink-primary);
+  font-family: var(--font-sans);
+  font-size: clamp(1.375rem, 2.2vw, 2rem);
+  font-weight: 650;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.panel-description {
+  max-width: 62ch;
+  margin-top: 8px;
+  color: var(--color-ink-secondary);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.panel-action {
+  flex: none;
+}
+
+.panel-body {
+  padding-top: 24px;
+}
+
+.panel-state {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  border: 1px solid var(--color-surface-3);
+  background: var(--color-surface-1);
+  padding: 32px;
+}
+
+.state-title {
+  color: var(--color-ink-primary);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.state-description {
+  margin-top: 6px;
+  color: var(--color-ink-secondary);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.skeleton-row {
+  height: 42px;
+  border: 1px solid var(--color-surface-3);
+  background: linear-gradient(90deg, var(--color-surface-1) 0%, var(--color-surface-2) 50%, var(--color-surface-1) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-sweep 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+.btn-primary,
+.btn-secondary,
+.btn-ghost {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  transition: background 120ms var(--ease-expo-out), border-color 120ms var(--ease-expo-out), color 120ms var(--ease-expo-out), transform 80ms ease;
+}
+
+.btn-primary {
+  border: 1px solid var(--color-signal-500);
+  background: var(--color-signal-500);
+  color: var(--color-surface-0);
+}
+
+.btn-primary:hover:not(:disabled) {
+  border-color: var(--color-signal-400);
+  background: var(--color-signal-400);
+}
+
+.btn-secondary {
+  border: 1px solid var(--color-surface-4);
+  background: transparent;
+  color: var(--color-ink-primary);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-ink-secondary);
+  background: var(--color-surface-2);
+}
+
+.btn-ghost {
+  min-height: 32px;
+  padding-inline: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-ink-secondary);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  color: var(--color-ink-primary);
+  background: var(--color-surface-2);
+}
+
+.btn-primary:active:not(:disabled),
+.btn-secondary:active:not(:disabled),
+.btn-ghost:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-ghost:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+html[data-theme="light"] .btn-primary {
+  border-color: var(--color-signal-600);
+  background: var(--color-signal-600);
+  color: white;
+}
+
+.field-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--color-ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.field-control {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid var(--color-surface-3);
+  border-radius: var(--radius-control);
+  background: var(--color-surface-2);
+  color: var(--color-ink-primary);
+  padding: 9px 12px;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+}
+
+.field-control::placeholder { color: var(--color-ink-muted); }
+.field-control:focus { border-color: var(--color-signal-500); background: var(--color-surface-1); box-shadow: var(--shadow-signal); }
+
+.data-list {
+  border: 1px solid var(--color-surface-3);
+  background: var(--color-surface-1);
+}
+
+.data-row {
+  padding: 16px;
+  border-bottom: 1px solid var(--color-surface-3);
+}
+.data-row:last-child { border-bottom: 0; }
+
+.status-text {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.status-active { color: var(--color-signal-400); }
+.status-ok { color: var(--color-ok); }
+.status-error { color: var(--color-error); }
+.status-neutral { color: var(--color-ink-muted); }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 767px) {
+  .panel-shell { padding: 20px 16px 32px; }
+  .panel-header { flex-direction: column; gap: 14px; padding-bottom: 16px; }
+  .panel-action { width: 100%; }
+  .panel-action > * { width: 100%; }
+  .panel-body { padding-top: 18px; }
+  .panel-state { min-height: 220px; padding: 24px 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-row { animation: none; }
+}
 
 /* ═══════════════════════════════════════════════════════
    Sidebar

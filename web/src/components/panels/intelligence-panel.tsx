@@ -3,35 +3,39 @@
 import { useEffect, useState } from "react"
 import * as api from "@/lib/api"
 import type { Memory } from "@/lib/api"
+import { PanelEmpty, PanelError, PanelLoading, PanelShell, requestError } from "@/components/ui/panel-state"
 
 export function IntelligencePanel() {
   const [memories, setMemories] = useState<Memory[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api.getActiveMemories().then(setMemories).catch(() => {}).finally(() => setLoading(false))
-  }, [])
+  const fetchMemories = () => {
+    setLoading(true)
+    setError(null)
+    api.getActiveMemories()
+      .then(setMemories)
+      .catch((cause) => setError(requestError(cause)))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { fetchMemories() }, [])
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 font-share">
-      <div className="max-w-[65ch] mx-auto">
-        <h2 className="text-heading font-semibold text-ink-primary mb-1">Intelligence</h2>
-        <p className="text-body text-ink-secondary mb-6">
-          Active memories and skills currently in context.
-        </p>
+    <PanelShell title="Intelligence" description="Memories currently active in the agent's context." width="narrow">
         {loading ? (
-          <p className="text-label text-ink-muted">Loading…</p>
+          <PanelLoading label="Loading active memories" />
+        ) : error ? (
+          <PanelError message={error} onRetry={fetchMemories} />
         ) : memories.length === 0 ? (
-          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted">
-            No active memories. They appear here when the agent uses them in conversation.
-          </div>
+          <PanelEmpty title="No active memories" description="Active memories appear here when the agent uses them in a conversation." />
         ) : (
           <div className="space-y-2">
             {memories.map(m => {
               const h = m.id.split("").reduce((a: number, c: string) => a + c.charCodeAt(0), 0)
               return (
-                <div key={m.id}
-                  className="bg-surface-1 border-l-2 border-signal-400 border border-surface-3 rounded-card card-hover-lift p-3 card-pulse-glow"
+                <article key={m.id}
+                  className="data-row border-l-2 border-l-signal-400 card-pulse-glow"
                   style={{"--pulse-duration": `${2.5 + (h % 1.5)}s`, "--pulse-delay": `${(h % 20) / 10}s`} as React.CSSProperties}>
                   <p className="text-body text-ink-primary mb-1.5">
                     {m.content}
@@ -41,12 +45,11 @@ export function IntelligencePanel() {
                       <span key={t} className="tag-pill tag-pill-blue">{t}</span>
                     ))}
                   </div>
-                </div>
+                </article>
               )
             })}
           </div>
         )}
-      </div>
-    </div>
+    </PanelShell>
   )
 }

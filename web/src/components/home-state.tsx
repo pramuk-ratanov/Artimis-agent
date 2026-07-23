@@ -30,7 +30,7 @@ export function HomeState({ onSend, onOpenTool }: {
         <div className="flex items-center gap-2 mb-8 animate-fade-up">
           <LivingSignal state="idle" size={6} />
           <span className="font-share text-[0.625rem] uppercase tracking-[0.16em] text-ink-muted">
-            Artimis — a Vital Signals company
+            Artimis, a Vital Signals company
           </span>
         </div>
 
