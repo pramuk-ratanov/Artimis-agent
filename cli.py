@@ -42,7 +42,15 @@ class c:
     BG_RED  = "\033[41m"
 
 # Ensure project is on path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, PROJECT_ROOT)
+
+# Load .env from project root (so ARTIMIS_HOME="." works)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+except Exception:
+    pass
 
 from artimis.db.schema import init_db, get_db, generate_id, now
 from artimis.db.manager import (
