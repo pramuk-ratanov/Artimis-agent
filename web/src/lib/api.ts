@@ -257,7 +257,7 @@ export function streamAgentMessage(message: string, sessionId?: string): Promise
 }
 
 export interface SSEEvent {
-  type: "tool" | "token" | "start" | "done" | "error"
+  type: "tool" | "token" | "start" | "done" | "error" | "reasoning"
   name?: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   args?: Record<string, any>

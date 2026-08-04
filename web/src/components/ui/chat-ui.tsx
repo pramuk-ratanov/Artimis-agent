@@ -24,6 +24,7 @@ interface ChatUIProps {
   onOpenCanvas?: (title: string, content: string) => void
   signalState?: SignalState
   streamingMsgId?: string | null
+  liveReasoning?: string
   placeholder?: string
   isLoading?: boolean
 }
@@ -165,6 +166,7 @@ export function ChatUI({
   messages, onSend, onRetry, onOpenTool, onOpenCanvas,
   signalState: _signalState = "idle",
   streamingMsgId = null,
+  liveReasoning = "",
   placeholder = "Message Artimis...", isLoading = false,
 }: ChatUIProps) {
   const [input, setInput] = useState("")
@@ -322,9 +324,25 @@ export function ChatUI({
                                 <div className="group/msg">
                                   <div className="msg-turn">
                                     {isStreaming ? (
-                                      <p className="msg-content text-body text-ink-primary font-share leading-relaxed whitespace-pre-wrap">
-                                        {extractCanvasBlock(msg.content).prose || "Designing…"}<span className="typing-cursor" />
-                                      </p>
+                                      <div className="msg-content text-body text-ink-primary font-share leading-relaxed whitespace-pre-wrap">
+                                        {liveReasoning && !extractCanvasBlock(msg.content).prose ? (
+                                          <div className="mb-2">
+                                            <div className="flex items-center gap-2 text-caption text-ink-muted font-share mb-1">
+                                              <span className="inline-block w-1.5 h-1.5 rounded-full bg-signal-400 animate-pulse" />
+                                              Thinking
+                                            </div>
+                                            <p className="text-ink-muted/80 text-sm italic leading-relaxed whitespace-pre-wrap">
+                                              {liveReasoning}
+                                              <span className="typing-cursor" />
+                                            </p>
+                                          </div>
+                                        ) : (
+                                          <>
+                                            {extractCanvasBlock(msg.content).prose || "Designing…"}
+                                            <span className="typing-cursor" />
+                                          </>
+                                        )}
+                                      </div>
                                     ) : (
                                       <>
                                         {prose && (

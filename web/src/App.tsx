@@ -56,6 +56,7 @@ function App() {
   const [notificationCount, setNotificationCount] = useState(0)
   const [offline, setOffline] = useState(false)
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null)
+  const [liveReasoning, setLiveReasoning] = useState("")
   const [canvasState, setCanvasState] = useState<{isOpen: boolean; title: string; content: string}>({isOpen: false, title: "", content: ""})
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
@@ -226,6 +227,7 @@ function App() {
     setIsLoading(true)
     setSignalState("thinking")
     setStreamingMsgId(amId)
+    setLiveReasoning("")
 
     try {
       const stream = await api.streamAgentMessage(text, activeChatId)
@@ -239,6 +241,7 @@ function App() {
 
         if (value.type === "tool") {
           setSignalState("thinking")
+          setLiveReasoning("")
           // canvas_update tool — open canvas with provided content immediately
           if (value.name === "canvas_update" && value.args?.content) {
             setCanvasState({ isOpen: true, title: value.args.title || "Canvas", content: value.args.content })
@@ -247,6 +250,9 @@ function App() {
           if (value.name === "design_audit") {
             setCanvasState(s => ({ isOpen: true, title: s.title || "Design Audit", content: s.content }))
           }
+        } else if (value.type === "reasoning") {
+          // Live "thoughts" from reasoning models (DeepSeek reasoning_content)
+          setLiveReasoning(prev => prev + (value.content || ""))
         } else if (value.type === "start") {
           setSignalState("streaming")
           if (value.session_id) sessionId = value.session_id
@@ -279,6 +285,7 @@ function App() {
 
       setSignalState("idle")
       setStreamingMsgId(null)
+      setLiveReasoning("")
 
       // Sync frontend ID with backend session
       if (sessionId && sessionId !== activeChatId) {
@@ -449,6 +456,7 @@ function App() {
                     onOpenCanvas={(title, content) => setCanvasState({ isOpen: true, title, content })}
                     signalState={signalState}
                     streamingMsgId={streamingMsgId}
+                    liveReasoning={liveReasoning}
                     isLoading={isLoading}
                   />
                 </div>

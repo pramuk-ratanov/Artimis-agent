@@ -34,11 +34,11 @@ if os.path.exists(_ENV_FILE):
                     os.environ[key] = val
 
 # Default model — supported models:
-#   DeepSeek:   deepseek-v4-pro, deepseek-v4-flash
+#   DeepSeek:   deepseek-v4-flash (fast, recommended default), deepseek-v4-pro (slow reasoning)
 #   Sakana:     sakana/fuga
 #   OpenAI:     gpt-4o, gpt-4o-mini, gpt-5.5
 #   OpenRouter: anthropic/claude-sonnet-4, anthropic/claude-opus-4, openai/gpt-5.5-pro
-DEFAULT_MODEL = os.getenv("ARTIMIS_MODEL", "deepseek-v4-pro")
+DEFAULT_MODEL = os.getenv("ARTIMIS_MODEL", "deepseek-v4-flash")
 
 
 def _get_client(model: Optional[str] = None) -> OpenAI:
@@ -472,6 +472,10 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
 
     tool_calls_made = 0
 
+    # Immediate feedback: tell the UI we're thinking before the first
+    # synchronous model call, so it never shows a blank "Designing…" state.
+    yield f"data: {json.dumps({'type': 'reasoning', 'content': 'Analyzing your message…'})}\n\n"
+
     # Phase 1: Tool calling loop (synchronous)
     for iteration in range(max_iterations):
         try:
@@ -565,6 +569,13 @@ If yes, add a brief note. Be proactive, not pushy. One insight per response maxi
                         continue  # drop this token entirely
                     streamed_parts.append(content)
                     yield f"data: {json.dumps({'type': 'token', 'content': content})}\n\n"
+                elif getattr(delta, "reasoning_content", None):
+                    # DeepSeek reasoning models emit their "thinking" as
+                    # reasoning_content. Stream it live so the UI shows the
+                    # agent's thoughts instead of a blank waiting state.
+                    reasoning = delta.reasoning_content
+                    if reasoning:
+                        yield f"data: {json.dumps({'type': 'reasoning', 'content': reasoning})}\n\n"
 
             # ── If streaming emitted tool call chunks, execute them now ──
             if pending_tool_chunks:
