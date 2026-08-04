@@ -12,8 +12,13 @@ build/
 *.db
 .env
 
-# Web UI (has its own .gitignore too)
-web/node_modules/
+# Python build artifacts
+dist/
+build/
+*.egg
+
+# Web UI (has its own .gitignore too) — but ship the built web/dist so it runs out of the box
+!web/dist/
 
 # IDE
 .vscode/
@@ -30,3 +35,10 @@ Thumbs.db
 *.log
 *.tmp
 .venv/
+
+# Dev noise (not for public repo)
+audits/daily-audit-*.md
+audits/screenshots-*/
+audits/smoke_daily.py
+web/e2e/
+web/test-results/

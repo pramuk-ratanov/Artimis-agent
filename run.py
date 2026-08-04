@@ -126,7 +126,10 @@ def main():
         repl()
     else:
         import uvicorn
-        print(f"  Starting Web UI on http://{args.host}:{args.port}")
+        # 0.0.0.0 is a bind address — browsers can't open it. Show a real URL.
+        browse_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
+        print(f"  Starting Web UI on http://{browse_host}:{args.port}")
+        print(f"  Open in browser: http://localhost:{args.port}")
         try:
             uvicorn.run(
                 "artimis.api.server:app",

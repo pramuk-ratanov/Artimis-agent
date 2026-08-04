@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Artimis</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" />
+    <script>
+      // Apply saved theme before first paint to avoid a flash of the wrong theme.
+      // Default is light (peec-style paper UI); dark is opt-in via Theme panel.
+      (function () {
+        try {
+          var q = new URLSearchParams(location.search).get("theme");
+          var t = (q === "light" || q === "dark") ? q : (localStorage.getItem("artimis-theme") || "dark");
+          if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" src="/assets/index-BkflRpmW.js"></script>
+    <link rel="modulepreload" href="/assets/chunk-M0oDzQ_3.js">
+    <link rel="stylesheet" href="/assets/index-BJW-isRp.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
