@@ -75,7 +75,10 @@ def test_streaming_terminal_errors_include_session_id():
 
     payloads = _sse_payloads(list(agent.run_agent_streaming("hello", session_id="session-123", max_iterations=0)))
 
-    assert payloads == [{"type": "error", "content": "Max iterations reached", "session_id": "session-123"}]
+    # The stream opens with an immediate "thinking" reasoning event (added so the
+    # UI shows activity instantly), then the terminal error.
+    assert payloads[0]["type"] == "reasoning"
+    assert payloads[1:] == [{"type": "error", "content": "Max iterations reached", "session_id": "session-123"}]
 
 
 def test_relevant_skills_route_is_not_shadowed_by_skill_id_route():
