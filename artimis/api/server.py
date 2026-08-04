@@ -58,17 +58,21 @@ def _maybe_auto_name_background(session_id: str) -> None:
 def _get_allowed_origins() -> list[str]:
     """Allowed browser origins for API access.
 
-    Defaults cover local development plus the current Tailscale-hosted Artimis UI.
-    Override with ARTIMIS_ALLOWED_ORIGINS as a comma-separated list if deploying
+    Defaults cover local development on any localhost port (local-first: the
+    web UI is served from the same origin, so CORS rarely matters). Override
+    with ARTIMIS_ALLOWED_ORIGINS as a comma-separated list if deploying
     behind a different hostname.
     """
     configured = os.getenv("ARTIMIS_ALLOWED_ORIGINS", "")
     if configured.strip():
         return [origin.strip().rstrip("/") for origin in configured.split(",") if origin.strip()]
     return [
+        "http://localhost:7001",
+        "http://127.0.0.1:7001",
         "http://localhost:7002",
         "http://127.0.0.1:7002",
-        "http://100.95.117.9:7002",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
     ]
 
 

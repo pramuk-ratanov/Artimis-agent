@@ -55,7 +55,7 @@ Your database, memories, skills, and uploaded files live in `ARTIMIS_HOME` (`art
 
 ```bash
 # Web UI (default)
-python run.py                     # http://0.0.0.0:7001
+python run.py                     # http://localhost:7001 (prints the exact URL)
 python run.py --port 8080         # custom port
 python run.py --host 127.0.0.1    # localhost only
 

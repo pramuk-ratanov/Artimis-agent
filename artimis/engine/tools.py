@@ -471,6 +471,11 @@ def handle_read_uploaded_file(args: dict) -> str:
         return safe_result(False, error=str(e))
 
 
+def _api_base() -> str:
+    """Base URL for self-API calls. Defaults to the running server; override with ARTIMIS_API_BASE."""
+    return os.getenv("ARTIMIS_API_BASE", "http://127.0.0.1:7002").rstrip("/")
+
+
 def handle_harness_snapshot(args: dict) -> str:
     """Take a harness snapshot via API."""
     _validate_required(args, ["component"], "harness_snapshot")
@@ -479,7 +484,7 @@ def handle_harness_snapshot(args: dict) -> str:
     try:
         import urllib.request as _ur
         data = json.dumps({"component": component, "source": "auto"}).encode()
-        req = _ur.Request("http://127.0.0.1:7002/api/harness/snapshot", data=data,
+        req = _ur.Request(f"{_api_base()}/api/harness/snapshot", data=data,
                          headers={"Content-Type": "application/json"}, method="POST")
         with _ur.urlopen(req, timeout=5) as resp:
             result = json.loads(resp.read())
@@ -498,7 +503,7 @@ def handle_harness_experiment(args: dict) -> str:
             "hypothesis": args["hypothesis"].strip(),
             "component": args["component"].strip(),
         }).encode()
-        req = _ur.Request("http://127.0.0.1:7002/api/harness/experiment", data=data,
+        req = _ur.Request(f"{_api_base()}/api/harness/experiment", data=data,
                          headers={"Content-Type": "application/json"}, method="POST")
         with _ur.urlopen(req, timeout=5) as resp:
             result = json.loads(resp.read())
