@@ -17,7 +17,15 @@ import argparse
 import signal
 
 # Ensure project root is on path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, PROJECT_ROOT)
+
+# Load .env from project root (so ARTIMIS_HOME="." works)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
+except Exception:
+    pass
 
 from artimis.db.schema import init_db
 
@@ -105,7 +113,8 @@ def main():
 
     # Initialize database
     init_db()
-    print(f"  Database initialized at ~/.artimis/artimis.db")
+    from artimis.db.schema import DB_PATH
+    print(f"  Database initialized at {DB_PATH}")
 
     if args.cli:
         from cli import repl

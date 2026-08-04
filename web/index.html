@@ -12,7 +12,7 @@
       (function () {
         try {
           var q = new URLSearchParams(location.search).get("theme");
-          var t = (q === "light" || q === "dark") ? q : (localStorage.getItem("artimis-theme") || "light");
+          var t = (q === "light" || q === "dark") ? q : (localStorage.getItem("artimis-theme") || "dark");
           if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
         } catch (e) {}
       })();

@@ -3,47 +3,51 @@
 import { useEffect, useState } from "react"
 import * as api from "@/lib/api"
 import type { GalleryItem } from "@/lib/api"
+import { PanelEmpty, PanelError, PanelLoading, PanelShell, StatusText, requestError, truncate } from "@/components/ui/panel-state"
 
 export function GalleryPanel() {
   const [items, setItems] = useState<GalleryItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    api.getGallery().then(setItems).catch(() => {}).finally(() => setLoading(false))
-  }, [])
+  const fetchGallery = () => {
+    setLoading(true)
+    setError(null)
+    api.getGallery()
+      .then(setItems)
+      .catch((cause) => setError(requestError(cause)))
+      .finally(() => setLoading(false))
+  }
+
+  useEffect(() => { fetchGallery() }, [])
 
   return (
-    <div className="flex-1 overflow-y-auto p-8 font-share">
-      <div className="max-w-4xl mx-auto">
-        <h2 className="text-heading font-semibold text-ink-primary mb-1">Gallery</h2>
-        <p className="text-body text-ink-secondary mb-6">
-          Generated images. Quality-passed items have a blue border.
-        </p>
+    <PanelShell title="Gallery" description="Generated image records and their quality results.">
         {loading ? (
-          <p className="text-label text-ink-muted italic">Loading…</p>
+          <PanelLoading label="Loading gallery" />
+        ) : error ? (
+          <PanelError message={error} onRetry={fetchGallery} />
         ) : items.length === 0 ? (
-          <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted">
-            No images yet. Generated images from conversations appear here.
-          </div>
+          <PanelEmpty title="No generated images" description="Images generated during conversations will appear here." />
         ) : (
-          <div className="grid grid-cols-3 md:grid-cols-4 gap-3">
+          <div className="data-list">
             {items.map(item => (
-              <div
-                key={item.id}
-                className={`aspect-square bg-surface-1 border rounded-card card-hover-lift overflow-hidden flex flex-col
-                  ${item.quality_pass ? "border-signal-400" : "border-surface-3"}`}
-              >
-                <div className="flex-1 bg-surface-2 flex items-center justify-center text-ink-muted text-caption">
-                  [img]
+              <article key={item.id} className="data-row">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-body font-semibold text-ink-primary">{truncate(item.prompt, 180)}</p>
+                    <p className="mt-1 text-caption text-ink-muted break-all">{item.thumbnail_path || item.file_path}</p>
+                  </div>
+                  <StatusText value={item.quality_pass ? "completed" : "pending"} />
                 </div>
-                <div className="p-2">
-                  <p className="text-caption text-ink-secondary truncate">{item.prompt.slice(0, 60)}</p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-caption text-ink-muted">
+                  {item.model && <span>Model: {item.model}</span>}
+                  {item.width && item.height && <span>{item.width} x {item.height}</span>}
                 </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
-      </div>
-    </div>
+    </PanelShell>
   )
 }

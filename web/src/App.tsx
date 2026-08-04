@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef, lazy, Suspense } from "react"
-import { Bell } from "@phosphor-icons/react"
+import { Bell, List, X } from "@phosphor-icons/react"
 import { IntroScreen } from "@/components/intro-screen"
 import { ChatUI, type ChatMessage } from "@/components/ui/chat-ui"
 import { ArtimisSidebar, type Project, type ChatSession } from "@/components/artimis-sidebar"
@@ -57,6 +57,7 @@ function App() {
   const [offline, setOffline] = useState(false)
   const [streamingMsgId, setStreamingMsgId] = useState<string | null>(null)
   const [canvasState, setCanvasState] = useState<{isOpen: boolean; title: string; content: string}>({isOpen: false, title: "", content: ""})
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
 
   const activeChat = chats.find(c => c.id === activeChatId) || chats[0]
@@ -361,44 +362,85 @@ function App() {
       {showIntro && <IntroScreen onComplete={handleIntroDone} />}
 
       {!showIntro && (
-        <div className="flex w-screen h-screen bg-surface-0 overflow-hidden">
-          <ArtimisSidebar
-            projects={projects} chats={sidebarChats} activeChatId={activeChatId}
-            signalState={signalState} onNewChat={handleNewChat} onSelectChat={handleSelectChat}
-            onCreateProject={handleCreateProject} onSelectTool={handleSelectTool}
-            onOpenSettings={() => setSettingsOpen(true)} activeTool={activeTool}
-            onArchiveChat={handleArchiveChat} onDeleteChat={handleDeleteChat}
-          />
+        <div className="flex w-full min-h-[100dvh] h-[100dvh] bg-surface-0 overflow-hidden">
+          {/* Desktop navigation */}
+          <div className="hidden md:block h-full shrink-0">
+            <ArtimisSidebar
+              projects={projects} chats={sidebarChats} activeChatId={activeChatId}
+              signalState={signalState} onNewChat={handleNewChat} onSelectChat={handleSelectChat}
+              onCreateProject={handleCreateProject} onSelectTool={handleSelectTool}
+              onOpenSettings={() => setSettingsOpen(true)} activeTool={activeTool}
+              onArchiveChat={handleArchiveChat} onDeleteChat={handleDeleteChat}
+            />
+          </div>
 
-          <main className="flex-1 min-w-0 overflow-hidden relative dark-horizon-glow">
+          {/* Mobile navigation drawer */}
+          {mobileNavOpen && (
+            <div className="fixed inset-0 z-50 md:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+              <button
+                className="absolute inset-0 bg-surface-0/80"
+                onClick={() => setMobileNavOpen(false)}
+                aria-label="Close navigation"
+              />
+              <div className="relative h-full w-[min(86vw,320px)]">
+                <ArtimisSidebar
+                  projects={projects} chats={sidebarChats} activeChatId={activeChatId}
+                  signalState={signalState}
+                  onNewChat={(pid) => { handleNewChat(pid); setMobileNavOpen(false) }}
+                  onSelectChat={(id) => { handleSelectChat(id); setMobileNavOpen(false) }}
+                  onCreateProject={handleCreateProject}
+                  onSelectTool={(tool) => { handleSelectTool(tool); setMobileNavOpen(false) }}
+                  onOpenSettings={() => { setSettingsOpen(true); setMobileNavOpen(false) }}
+                  activeTool={activeTool}
+                  onArchiveChat={handleArchiveChat}
+                  onDeleteChat={handleDeleteChat}
+                />
+                <button className="absolute right-3 top-3 btn-ghost" onClick={() => setMobileNavOpen(false)} aria-label="Close navigation">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+          )}
+
+          <main className="flex-1 min-w-0 overflow-hidden relative dark-horizon-glow pt-11 md:pt-0">
+            <div className="absolute top-0 inset-x-0 z-20 h-11 md:hidden flex items-center justify-between px-3 border-b border-surface-3 bg-surface-1">
+              <button className="btn-ghost !min-h-8 !px-2" onClick={() => setMobileNavOpen(true)} aria-label="Open navigation">
+                <List size={19} />
+              </button>
+              <span className="text-label font-semibold text-ink-primary">Artimis</span>
+              <button className="btn-ghost !min-h-8 !px-2" onClick={() => setNotificationCount(0)} aria-label="Notifications">
+                <Bell size={17} weight={notificationCount > 0 ? "fill" : "regular"} />
+              </button>
+            </div>
             {/* Notification bell */}
             <button
-              className="absolute top-2 right-3 z-10 w-7 h-7 flex items-center justify-center rounded-control
+              aria-label="Clear notifications"
+              className="hidden md:flex absolute top-2 right-3 z-10 w-7 h-7 items-center justify-center rounded-control
                 text-ink-muted hover:text-ink-secondary hover:bg-surface-2 transition-all duration-150"
               onClick={() => setNotificationCount(0)}
             >
               <Bell size={14} weight={notificationCount > 0 ? "fill" : "regular"} />
-              {notificationCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 flex items-center justify-center
-                  rounded-full bg-signal-600 text-[0.5rem] font-bold text-ink-primary">
+              <span className="t-badge" data-open={notificationCount > 0}>
+                <span className="t-badge-dot w-4 h-4 flex items-center justify-center
+                  rounded-full bg-signal-600 text-[0.5rem] font-bold text-white">
                   {notificationCount > 9 ? "9+" : notificationCount}
                 </span>
-              )}
+              </span>
             </button>
 
             {/* Offline banner */}
             {offline && (
               <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 bg-warn/10 border border-warn/30
                 rounded-control text-caption font-medium text-warn">
-                Offline — waiting for connection
+                Offline. Waiting for connection
               </div>
             )}
 
             {activeTool ? (
               renderToolPanel()
             ) : (
-              <div className="flex h-full w-full">
-                <div className={`flex-1 transition-all duration-300 ${canvasState.isOpen ? 'w-1/2 min-w-[400px]' : 'w-full'}`}>
+              <div className="flex h-full w-full relative">
+                <div className={`flex-1 min-w-0 transition-all duration-300 ${canvasState.isOpen ? 'hidden lg:block lg:w-1/2' : 'w-full'}`}>
                   <ChatUI
                     messages={activeChat.messages}
                     onSend={handleSend}
@@ -412,8 +454,8 @@ function App() {
                 </div>
                 {canvasState.isOpen && (
                   <Suspense fallback={
-                    <div className="flex items-center justify-center w-1/2 h-full bg-surface-1 border-l border-surface-3">
-                      <span className="text-label text-ink-muted font-share">Loading canvas…</span>
+                    <div className="flex items-center justify-center w-full lg:w-1/2 h-full bg-surface-1 border-l border-surface-3" role="status" aria-live="polite">
+                      <span className="text-label text-ink-muted font-share">Loading canvas...</span>
                     </div>
                   }>
                     <CanvasPanel

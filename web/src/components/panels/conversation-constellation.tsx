@@ -45,8 +45,9 @@ export function ConversationConstellation() {
   useEffect(() => {
     api.getConversationGraph()
       .then(g => { setGraph(g); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch(() => { setGraph({ nodes: [], edges: [] }); setLoading(false); setError(true) })
   }, [])
+  const [error, setError] = useState(false)
 
   useEffect(() => { hoverRef.current = hover }, [hover])
   useEffect(() => { selectedRef.current = selected }, [selected])
@@ -339,11 +340,15 @@ export function ConversationConstellation() {
       <div className="relative" style={{ height: 420 }}>
         {loading ? (
           <div className="absolute inset-0 grid place-items-center text-caption text-ink-muted">
-            mapping conversations…
+            mapping conversations...
+          </div>
+        ) : error ? (
+          <div className="absolute inset-0 grid place-items-center text-caption text-error">
+            Unable to load conversation graph
           </div>
         ) : graph.nodes.length === 0 ? (
           <div className="absolute inset-0 grid place-items-center text-caption text-ink-muted">
-            No conversations yet — start chatting to grow the constellation
+            No conversations yet. Start chatting to grow the constellation
           </div>
         ) : (
           <canvas ref={canvasRef} className="w-full h-full block" />

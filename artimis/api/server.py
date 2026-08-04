@@ -1161,6 +1161,35 @@ async def get_statistics():
         except Exception:
             pass
 
+        # Message volume per day (last 90 days) — dashboard area chart
+        vol_rows = conn.execute(
+            "SELECT date(created_at) as day, COUNT(*) as count FROM messages "
+            "WHERE created_at >= date('now', '-89 days') GROUP BY day ORDER BY day"
+        ).fetchall()
+        messages_per_day = [{"day": r["day"], "count": r["count"]} for r in vol_rows]
+
+        # Honest 7-day deltas for the stat cards
+        messages_last_7d = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE created_at >= datetime('now', '-7 days')"
+        ).fetchone()[0]
+        messages_prev_7d = conn.execute(
+            "SELECT COUNT(*) FROM messages WHERE created_at >= datetime('now', '-14 days') "
+            "AND created_at < datetime('now', '-7 days')"
+        ).fetchone()[0]
+        sessions_last_7d = conn.execute(
+            "SELECT COUNT(*) FROM sessions WHERE created_at >= datetime('now', '-7 days')"
+        ).fetchone()[0]
+        sessions_prev_7d = conn.execute(
+            "SELECT COUNT(*) FROM sessions WHERE created_at >= datetime('now', '-14 days') "
+            "AND created_at < datetime('now', '-7 days')"
+        ).fetchone()[0]
+
+        # Tasks by status — dashboard breakdown card
+        task_rows = conn.execute(
+            "SELECT status, COUNT(*) as count FROM tasks GROUP BY status"
+        ).fetchall()
+        tasks_by_status = {r["status"]: r["count"] for r in task_rows}
+
     # Calculate percentages for focus areas
     focus_areas = []
     if focus_sessions:
@@ -1178,6 +1207,12 @@ async def get_statistics():
         "topSkills": top_skills,
         "focusAreas": focus_areas or [{"topic": "No data yet", "sessions": 1, "messages": 0, "percentage": 100}],
         "critiqueTrend": critique_trend,
+        "messagesPerDay": messages_per_day,
+        "messagesLast7d": messages_last_7d,
+        "messagesPrev7d": messages_prev_7d,
+        "sessionsLast7d": sessions_last_7d,
+        "sessionsPrev7d": sessions_prev_7d,
+        "tasksByStatus": tasks_by_status,
     }
 
 

@@ -536,6 +536,12 @@ export interface StatsSummary {
   topSkills: { name: string; value: number }[]
   focusAreas: { topic: string; sessions: number; messages: number; percentage: number }[]
   critiqueTrend: { day: string; avg_score: number; count: number }[]
+  messagesPerDay: { day: string; count: number }[]
+  messagesLast7d: number
+  messagesPrev7d: number
+  sessionsLast7d: number
+  sessionsPrev7d: number
+  tasksByStatus: Record<string, number>
 }
 
 export function getStats() {

@@ -10,25 +10,29 @@ import {
   type HarnessExperiment as Experiment,
   type HarnessTestCase as TestCase,
 } from "@/lib/api"
+import { PanelEmpty, PanelError, PanelLoading, PanelShell, StatusText, formatTimestamp, requestError } from "@/components/ui/panel-state"
 
 export function HarnessLabPanel() {
   const [snapshots, setSnapshots] = useState<Snapshot[]>([])
   const [experiments, setExperiments] = useState<Experiment[]>([])
   const [testCases, setTestCases] = useState<TestCase[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [snapshotMsg, setSnapshotMsg] = useState("")
 
   const fetchAll = useCallback(() => {
     setLoading(true)
+    setError(null)
     Promise.all([
-      getHarnessVersions(20).catch(() => []),
-      getHarnessExperiments(20).catch(() => []),
-      getHarnessTestCases().catch(() => []),
+      getHarnessVersions(20),
+      getHarnessExperiments(20),
+      getHarnessTestCases(),
     ]).then(([s, e, t]) => {
       setSnapshots(s)
       setExperiments(e)
       setTestCases(t)
-    }).finally(() => setLoading(false))
+    }).catch((cause) => setError(requestError(cause)))
+      .finally(() => setLoading(false))
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
@@ -39,40 +43,27 @@ export function HarnessLabPanel() {
       const res = await createHarnessSnapshot(component, "manual")
       setSnapshotMsg(`Snapshotted: ${res.count} component(s) at v${res.latest_version}`)
       fetchAll()
-    } catch {
-      setSnapshotMsg("Snapshot failed")
+    } catch (cause) {
+      setSnapshotMsg(`Snapshot failed: ${requestError(cause)}`)
     }
     setTimeout(() => setSnapshotMsg(""), 3000)
   }
 
-  const outcomeColor = (o: string) => {
-    switch (o) {
-      case "applied": return "text-ok"
-      case "rejected": return "text-error"
-      case "pending": return "text-warn"
-      default: return "text-ink-muted"
-    }
-  }
-
   return (
-    <div className="flex-1 overflow-y-auto p-8 font-share">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-heading font-semibold text-ink-primary mb-1">Harness Lab</h2>
-            <p className="text-body text-ink-secondary">
-              Self-improvement engine. Snapshots, experiments, and test cases for optimizing the agent harness.
-            </p>
-          </div>
-          {snapshotMsg && (
-            <span className="text-caption text-signal-400 bg-surface-2 px-2 py-1 rounded-control border border-signal-600">
-              {snapshotMsg}
-            </span>
-          )}
-        </div>
+    <PanelShell
+      title="Harness Lab"
+      description="Snapshots, experiments, and test cases for evaluating changes to the agent harness."
+      action={snapshotMsg ? (
+        <span className="text-caption text-signal-400" role="status" aria-live="polite">
+          {snapshotMsg}
+        </span>
+      ) : undefined}
+    >
 
         {loading ? (
-          <p className="text-label text-ink-muted">Loading…</p>
+          <PanelLoading rows={6} label="Loading harness lab" />
+        ) : error ? (
+          <PanelError message={error} onRetry={fetchAll} />
         ) : (
           <>
             {/* Snapshots */}
@@ -81,17 +72,14 @@ export function HarnessLabPanel() {
                 <h3 className="text-body font-semibold text-ink-primary">Snapshots</h3>
                 <div className="flex gap-1.5">
                   {["system_prompt", "tools", "brain", "all"].map(c => (
-                    <button key={c} onClick={() => handleSnapshot(c)}
-                      className="text-caption px-2 py-0.5 rounded-control border border-surface-3 text-ink-muted hover:text-signal-400 hover:border-signal-600 transition-colors cursor-pointer">
-                      + {c.replace("_", " ")}
+                    <button type="button" key={c} onClick={() => handleSnapshot(c)} className="btn-ghost">
+                      {c.replace("_", " ")}
                     </button>
                   ))}
                 </div>
               </div>
               {snapshots.length === 0 ? (
-                <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted">
-                  No snapshots yet. Take one to start versioning your harness.
-                </div>
+                <PanelEmpty title="No snapshots" description="Take a snapshot to start versioning the harness." />
               ) : (
                 <div className="space-y-1">
                   {snapshots.slice(0, 10).map(s => (
@@ -101,7 +89,7 @@ export function HarnessLabPanel() {
                         <span className="text-caption text-ink-secondary">{s.component}</span>
                         <span className="text-caption text-ink-muted">{s.source}</span>
                       </div>
-                      <span className="text-caption text-ink-faint">{s.created_at}</span>
+                      <time className="text-caption text-ink-faint" dateTime={s.created_at}>{formatTimestamp(s.created_at)}</time>
                     </div>
                   ))}
                 </div>
@@ -112,23 +100,19 @@ export function HarnessLabPanel() {
             <div>
               <h3 className="text-body font-semibold text-ink-primary mb-3">Experiments</h3>
               {experiments.length === 0 ? (
-                <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted">
-                  No experiments yet. They auto-trigger when the agent detects consistent low scores.
-                </div>
+                <PanelEmpty title="No experiments" description="Experiments appear when the agent detects consistently low evaluation scores." />
               ) : (
                 <div className="space-y-1">
                   {experiments.map(e => (
                     <div key={e.id} className="bg-surface-1 border border-surface-3 rounded-control px-3 py-2">
                       <div className="flex items-center justify-between mb-0.5">
                         <span className="text-label text-ink-primary truncate mr-2">{e.hypothesis}</span>
-                        <span className={`text-caption font-semibold shrink-0 ${outcomeColor(e.outcome)}`}>
-                          {e.outcome}
-                        </span>
+                        <StatusText value={e.outcome} />
                       </div>
                       <div className="flex items-center gap-3 text-caption text-ink-muted">
                         <span>{e.component}</span>
                         {e.score_before != null && <span>score: {e.score_before} → {e.score_after}</span>}
-                        <span className="text-ink-faint">{e.created_at}</span>
+                        <time className="text-ink-faint" dateTime={e.created_at}>{formatTimestamp(e.created_at)}</time>
                       </div>
                     </div>
                   ))}
@@ -140,15 +124,13 @@ export function HarnessLabPanel() {
             <div>
               <h3 className="text-body font-semibold text-ink-primary mb-3">Test Cases</h3>
               {testCases.length === 0 ? (
-                <div className="bg-surface-1 border border-surface-3 rounded-card card-hover-lift p-4 text-label text-ink-muted">
-                  No test cases. They're auto-created from user corrections during conversations.
-                </div>
+                <PanelEmpty title="No test cases" description="Test cases are created from user corrections during conversations." />
               ) : (
                 <div className="space-y-1">
                   {testCases.map(tc => (
                     <div key={tc.id} className="bg-surface-1 border border-surface-3 rounded-control px-3 py-2">
                       <p className="text-label text-ink-primary truncate">{tc.input_message}</p>
-                      <span className="text-caption text-ink-faint">{tc.created_at}</span>
+                      <time className="text-caption text-ink-faint" dateTime={tc.created_at}>{formatTimestamp(tc.created_at)}</time>
                     </div>
                   ))}
                 </div>
@@ -156,7 +138,6 @@ export function HarnessLabPanel() {
             </div>
           </>
         )}
-      </div>
-    </div>
+    </PanelShell>
   )
 }

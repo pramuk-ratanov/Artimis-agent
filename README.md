@@ -16,36 +16,55 @@ A local-first, self-hosted AI agent that grows with you. Learns from every inter
 ## Quick start
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/pramuk-ratanov/Artimis-agent/main/install.sh | bash
-```
-
-Or manually:
-
-```bash
 git clone https://github.com/pramuk-ratanov/Artimis-agent.git
 cd Artimis-agent
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env  # add your API key
-python cli.py
+cp .env.example .env   # add your API keys
+python run.py --check  # verify setup
+python run.py          # Web UI on http://localhost:7001
 ```
+
+Or run the terminal version:
+
+```bash
+python run.py --cli
+```
+
+## Configuration
+
+Copy `.env.example` to `.env` and fill in your keys:
+
+| Variable | Purpose |
+|----------|---------|
+| `DEEPSEEK_API_KEY` | Your DeepSeek API key (model provider) |
+| `ARTIMIS_API_KEY` | Any random string — used to authenticate API calls |
+| `ARTIMIS_HOME` | Where data lives. Default `~/.artimis`, set `.` for project folder |
+| `ARTIMIS_ALLOWED_ORIGINS` | CORS origins for the web UI (comma-separated) |
+
+Your database, memories, skills, and uploaded files live in `ARTIMIS_HOME` (`artimis.db`, `files/`, `skills/`).
 
 ## Requirements
 
 - Python 3.11+
-- A DeepSeek, OpenAI, or Anthropic API key
+- A DeepSeek API key (or configure another provider in `.env`)
 - SQLite (built-in, no external database needed)
 
-## Uninstall
+## Running
 
 ```bash
-# Full removal (agent + all data):
-bash uninstall.sh --yes
+# Web UI (default)
+python run.py                     # http://0.0.0.0:7001
+python run.py --port 8080         # custom port
+python run.py --host 127.0.0.1    # localhost only
 
-# Remove agent, keep your memories, skills, and database:
-bash uninstall.sh --keep-data
+# Terminal REPL
+python run.py --cli
+
+# Health check
+python run.py --check
 ```
-
-All Artimis files live in `~/.artimis/`. No system files are modified, no launch agents installed, no PATH changes.
 
 ## Architecture
 
@@ -60,30 +79,22 @@ artimis/
     task_runner.py    # Multi-phase background task execution
     tools.py          # Tool schemas & execution
   api/
-    server.py         # FastAPI server (60+ endpoints)
+    server.py         # FastAPI server
   db/
     schema.py         # SQLite schema
     manager.py        # CRUD operations
   web/                # React + Tailwind v4 Web UI
 ```
 
-## Web UI
-
-Start the server:
-
-```bash
-python -m uvicorn artimis.api.server:app --host 127.0.0.1 --port 7001
-```
-
-Open `http://127.0.0.1:7001` — dark signal theme, Share Tech Mono, 200px sidebar, tool panels, Cmd+K palette.
-
-## CLI
+## CLI commands
 
 ```bash
 python cli.py                  # New session
 python cli.py --session <id>   # Resume session
 python cli.py --list           # List past sessions
 ```
+
+Inside the REPL: `/new`, `/sessions`, `/resume <id>`, `/memory`, `/skills`, `/help`, `/quit`.
 
 ## License
 
