@@ -37,8 +37,10 @@ def _check_setup():
     messages = []
     status = True
 
-    # Check .env
-    env_file = os.path.expanduser("~/.artimis/.env")
+    # Check .env — project root first (local-first), then legacy ~/.artimis
+    project_env = os.path.join(PROJECT_ROOT, ".env")
+    legacy_env = os.path.expanduser("~/.artimis/.env")
+    env_file = project_env if os.path.exists(project_env) else legacy_env
     if os.path.exists(env_file):
         with open(env_file) as f:
             has_key = any(
@@ -46,12 +48,14 @@ def _check_setup():
                 for line in f
             )
         if has_key:
-            messages.append("[ok] .env file found with configuration")
+            messages.append(f"[ok] .env file found with configuration ({env_file})")
         else:
             messages.append("[warn] .env file exists but no keys configured")
             status = False
     else:
-        messages.append("[error] No .env file at ~/.artimis/.env — create one with your API key")
+        messages.append(
+            "[error] No .env file found — copy .env.example to .env in the project folder and add your API key"
+        )
         status = False
 
     # Check DB
